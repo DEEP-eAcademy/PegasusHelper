@@ -1,6 +1,8 @@
 # PegasusHelper
 The pegasus helper is a small helper plugin for ILIAS which is required to
-operate the ILIAS Pegasus mobile application.
+operate the IACUBUS mobile application.
+
+This is fork of an OpenSource project created by fluxlabs ag, CH-Burgdorf (https://fluxlabs.ch)
 
 Features:
 - Custom app login flow
@@ -12,33 +14,36 @@ Features:
 - Basic user token statistic
 - Basic plugin setup tests which verify your local ILIAS configuration
 
-
-
 ## Requirements
-* Version: ILIAS 5.3 to 7
-* PHP 5.6 or PHP 7.0 - 7.4
+* Version: ILIAS 8
+* PHP 7.0 - 7.4
 
 ## Installation
 
 ### 1. Install RESTPlugin
-Branch feature/sr-app-routes  
 Start at your ILIAS root directory 
 ```bash
 mkdir -p Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/  
 cd Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/  
-git clone https://github.com/studer-raimann/Ilias.RESTPlugin REST
-cd REST
-git checkout feature/sr-app-routes
+git clone https://github.com/Jakub-eAcademy/Ilias.RESTPlugin REST
 ```  
 Update and activate the plugin in the ILIAS Plugin Administration.
+```
+cd <ILIAS_ROOT_PATH>
+composer-install --no-dev
+```
 
 ### 2. Install PegausHelper
 Start at your ILIAS root directory 
 ```bash
 cd Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/  
-git clone https://github.com/fluxapps/PegasusHelper.git  
+git clone https://github.com/Jakub-eAcademy/PegasusHelper.git
 ```
 Update and activate the plugin in the ILIAS Plugin Administration.
+```
+cd <ILIAS_ROOT_PATH>
+composer-install --no-dev
+```
 
 ### 3. Get the API Secret  
 - Go to the ILIAS Plugin Administration  
@@ -62,24 +67,29 @@ Also read through the paragraph 'Caveats' below
 ## Update
 
 ### 1. Update RESTPlugin
-Branch feature/sr-app-routes
 Start at your ILIAS root directory
-
 ```bash
 cd Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/REST
 git pull
 ```
 Update / activate the plugin in the ILIAS Plugin Administration.
+```
+cd <ILIAS_ROOT_PATH>
+composer-install --no-dev
+```
 
 ### 2. Update PegasusHelper
 Start at your ILIAS root directory 
-
 ```bash
 cd Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper
 git pull
 ```
 
 Update / activate the plugin in the ILIAS Plugin Administration.
+```
+cd <ILIAS_ROOT_PATH>
+composer-install --no-dev
+```
 
 ## Caveats
 ### ILIAS http path
@@ -118,4 +128,4 @@ This project is licensed under the GNU GPLv3 License - see the LICENSE.md file f
 Please create pull requests :fire:
 
 ## Adjustment suggestions / bug reporting :feet:
-Please [read and create issues](https://github.com/fluxapps/PegasusHelper/issues) :kissing_heart:
+Please [read and create issues](https://github.com/Jakub-eAcademy/PegasusHelper/issues) :kissing_heart:
