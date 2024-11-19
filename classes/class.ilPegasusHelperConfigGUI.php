@@ -24,11 +24,6 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
     ];
     public static $ICON_WEB_DIR = "pegasushelper/theme/icons/";
 
-    public function __construct()
-    {
-        $this->pl = new ilPegasusHelperPlugin();
-    }
-
     /**
      * copies the default icons to the directory for the synchronization with the app
      */
@@ -56,6 +51,8 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
     public function performCommand($cmd): void
     {
         global $ilTabs, $ilCtrl, $tpl;
+        $this->pl = $this->getPluginObject();
+
         $ilTabs->addSubTab(
             "id_general",
             $this->pl->txt("tab_general"),
