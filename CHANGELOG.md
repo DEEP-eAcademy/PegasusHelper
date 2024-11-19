@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [4.0.0]
 ### Added
 - ILIAS 8 Support
+### Removed
+- ILIAS 7 and 6 Support
 
 ## [3.0.0]
 ### Added
