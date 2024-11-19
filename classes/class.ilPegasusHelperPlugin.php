@@ -19,11 +19,6 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     private static $instance;
 
     /**
-     * @var ilPluginAdmin $plugin
-     */
-    private $plugin;
-
-    /**
      * @return ilPegasusHelperPlugin
      */
     public static function getInstance(ilDBInterface $db, ilComponentRepositoryWrite $component_repository, string $id): ilPegasusHelperPlugin
@@ -43,8 +38,6 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
          * @var Container $DIC
          */
         global $DIC;
-
-        $this->plugin = $DIC['ilPluginAdmin'];
     }
 
     /**
@@ -60,7 +53,8 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
      */
     protected function beforeUpdate(): bool
     {
-        if (!$this->plugin->isActive(IL_COMP_SERVICE, 'UIComponent', 'uihk', 'REST')) {
+        global $DIC;
+        if (!$DIC["component.repository"]->hasActivatedPlugin("rest")) {
             ilUtil::sendFailure('Please install the ILIAS REST Plugin first!', true);
             return false;
         }
@@ -76,8 +70,8 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
             global $ilDB;
             $ilDB->dropTable("ui_uihk_pegasus_theme", false);
 
-            global $ilPluginAdmin;
-            if ($ilPluginAdmin->isActive(IL_COMP_SERVICE, 'UIComponent', 'uihk', 'REST')) {
+            global $DIC;
+            if (!$DIC["component.repository"]->hasActivatedPlugin("rest")) {
                 require_once './Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/bootstrap.php';
 
                 $rest = new SRAG\PegasusHelper\rest\RestSetup();
