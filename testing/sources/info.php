@@ -49,7 +49,7 @@ function getConnectivityInfo()
         addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");
     }
 
-    $external_host = "https://test.studer-raimann.ch/pegasus-ilias53-php7"; // TODO setup backend (summarize urls in constants-file?)
+    $external_host = ""; // TODO setup backend (summarize urls in constants-file?)
     try {
         $connectivity_info["external_url"] = httpLoggedRequest($external_host);
     } catch (Exception $e) {
