@@ -321,12 +321,12 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
      */
     protected function saveColors()
     {
-        global $ilDB, $ilCtrl;
+        global $ilDB, $ilCtrl, $tpl;
         $primaryColor = $_POST["primary_color"];
         $contrastColor = $_POST["contrast_color"];
 
         if (!preg_match("/^[0-9a-fA-F]{6}$/", $primaryColor)) {
-            ilUtil::sendFailure($this->pl->txt("msg_coloring_not_saved"), true);
+            $tpl->setOnScreenMessage( 'failure', $this->pl->txt("msg_coloring_not_saved"), true);
             $ilCtrl->redirect($this, "theme");
             return;
         }
@@ -341,7 +341,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $ilDB->update("ui_uihk_pegasus_theme", $values, $where);
 
         $this->updateTimestamp();
-        ilUtil::sendSuccess($this->pl->txt("msg_coloring_saved"), true);
+        $tpl->setOnScreenMessage( 'success', $this->pl->txt("msg_coloring_saved"), true);
         $ilCtrl->redirect($this, "theme");
     }
 
@@ -350,7 +350,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
      */
     protected function resetColors()
     {
-        global $ilDB, $ilCtrl;
+        global $ilDB, $ilCtrl, $tpl;
 
         $values = array(
             "primary_color" => array("text", "4a668b"),
@@ -362,13 +362,13 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $ilDB->update("ui_uihk_pegasus_theme", $values, $where);
 
         $this->updateTimestamp();
-        ilUtil::sendSuccess($this->pl->txt("msg_coloring_reset"), true);
+        $tpl->setOnScreenMessage( 'success', $this->pl->txt("msg_coloring_reset"), true);
         $ilCtrl->redirect($this, "theme");
     }
 
     protected function saveIcons()
     {
-        global $ilCtrl, $DIC;
+        global $ilCtrl, $DIC, $tpl;
 
         $form = $this->getIconsForm();
         if ($form->checkInput()) {
@@ -408,13 +408,13 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
             $this->updateTimestamp();
             // user feedback
             if ($msgSuccess) {
-                ilUtil::sendSuccess($msgSuccess, true);
+                $tpl->setOnScreenMessage( 'success', $msgSuccess, true);
             }
             if ($msgFail) {
-                ilUtil::sendFailure($msgFail, true);
+                $tpl->setOnScreenMessage( 'failure', $msgFail, true);
             }
         } else {
-            ilUtil::sendFailure($this->pl->txt("msg_icons_not_saved"), true);
+            $tpl->setOnScreenMessage( 'failure', $this->pl->txt("msg_icons_not_saved"), true);
         }
 
         $ilCtrl->redirect($this, "theme");
@@ -425,12 +425,12 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
      */
     protected function resetIcons()
     {
-        global $ilCtrl;
+        global $ilCtrl, $tpl;
 
         ilPegasusHelperConfigGUI::copyDefaultIcons();
 
         $this->updateTimestamp();
-        ilUtil::sendSuccess($this->pl->txt("msg_icons_reset"), true);
+        $tpl->setOnScreenMessage( 'success', $this->pl->txt("msg_icons_reset"), true);
         $ilCtrl->redirect($this, "theme");
     }
 

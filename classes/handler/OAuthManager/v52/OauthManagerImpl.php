@@ -5,7 +5,6 @@ namespace SRAG\PegasusHelper\handler\OAuthManager\v52;
 use Exception;
 use ilException;
 use ilObjUser;
-use ilUtil;
 use RESTController\core\oauth2_v2\Common;
 use RESTController\RESTController;
 use SRAG\PegasusHelper\handler\BaseHandler;
@@ -128,7 +127,7 @@ final class OauthManagerImpl extends BaseHandler implements ChainRequestHandler
      */
     public static function getRestClientId($access_token)
     {
-        global $ilIliasIniFile;
+        global $ilIliasIniFile, $tpl;
         $ch = curl_init();
         $HOST = $ilIliasIniFile->readVariable('server', 'http_path');
 
@@ -151,8 +150,7 @@ final class OauthManagerImpl extends BaseHandler implements ChainRequestHandler
                 return $result['id'];
             }
         }
-
-        ilUtil::sendFailure('API KEY ' . self::API_KEY . ' not Found', true);
+        $tpl->setOnScreenMessage( 'failure', 'API KEY ' . self::API_KEY . ' not Found', true);
         return false;
     }
 }

@@ -53,9 +53,9 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
      */
     protected function beforeUpdate(): bool
     {
-        global $DIC;
+        global $DIC, $tpl;
         if (!$DIC["component.repository"]->hasActivatedPlugin("rest")) {
-            ilUtil::sendFailure('Please install the ILIAS REST Plugin first!', true);
+            $tpl->setOnScreenMessage( 'failure', 'Please install the ILIAS REST Plugin first!', true);
             return false;
         }
         return true;
@@ -67,7 +67,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     protected function beforeUninstall(): bool
     {
         try {
-            global $ilDB;
+            global $ilDB, $tpl;
             $ilDB->dropTable("ui_uihk_pegasus_theme", false);
 
             global $DIC;
@@ -79,7 +79,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
             }
             return true;
         } catch (Exception $e) {
-            ilUtil::sendFailure("There was a problem when uninstalling the PegasuHelper plugin", true);
+            $tpl->setOnScreenMessage( 'failure', "There was a problem when uninstalling the PegasuHelper plugin", true);
             return false;
         }
     }

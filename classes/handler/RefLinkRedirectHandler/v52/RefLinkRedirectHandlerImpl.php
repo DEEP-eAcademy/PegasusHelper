@@ -99,17 +99,18 @@ final class RefLinkRedirectHandlerImpl extends BaseHandler implements RefLinkRed
      */
     private function redirect()
     {
+        global $DIC;
         if (!self::$self_call) {
             self::$self_call = true;
 
             switch ($this->view) {
                 case "default":
                     $link = ilLink::_getLink($this->refId);
-                    ilUtil::redirect($link);
+                    $DIC->ctrl()->redirectToURL($link);
                     break;
                 case "timeline":
 
-                    global $ilCtrl;
+                    global $ilCtrl, $DIC;
 
                     $type = ilObject2::_lookupType($this->refId, true);
 
@@ -119,10 +120,10 @@ final class RefLinkRedirectHandlerImpl extends BaseHandler implements RefLinkRed
 
                     if ($type === "crs") {
                         $link = $ilCtrl->getLinkTargetByClass(["ilrepositorygui", "ilobjcoursegui", "ilnewstimelinegui"]);
-                        ilUtil::redirect(ilUtil::_getHttpPath() . "/ilias.php" . htmlspecialchars_decode($link));
+                        $DIC->ctrl()->redirectToURL(ilUtil::_getHttpPath() . "/ilias.php" . htmlspecialchars_decode($link));
                     } elseif ($type === "grp") {
                         $link = $ilCtrl->getLinkTargetByClass(["ilrepositorygui", "ilobjgroupgui", "ilnewstimelinegui"]);
-                        ilUtil::redirect(ilUtil::_getHttpPath() . "/ilias.php" . htmlspecialchars_decode($link));
+                        $DIC->ctrl()->redirectToURL(ilUtil::_getHttpPath() . "/ilias.php" . htmlspecialchars_decode($link));
                     }
                     break;
             }
