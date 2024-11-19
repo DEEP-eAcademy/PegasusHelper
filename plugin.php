@@ -1,7 +1,7 @@
 <?php
 $id = 'sragpegasushelper';
-$version = '3.0.0';
-$ilias_min_version = '7.0.0';
+$version = '4.0.0';
+$ilias_min_version = '8.0.0';
 $ilias_max_version = '8.99';
-$responsible = 'fluxlabs AG';
-$responsible_mail = 'support@fluxlabs.ch';
+$responsible = 'Jakub';
+$responsible_mail = 'jakub@deepeacademy.com';
