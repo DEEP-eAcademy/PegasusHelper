@@ -26,6 +26,7 @@ abstract class ilPegasusTestingStatus
 
     public static function getStatusImagePath($status)
     {
-        return ilLearningProgressBaseGUI::_getImagePathForStatus($status);
+        $status_icons = \ilLPStatusIcons::getInstance(\ilLPStatusIcons::ICON_VARIANT_SCORM);
+        return $status_icons->getImagePathForStatus($status);
     }
 }
