@@ -26,18 +26,18 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     /**
      * @return ilPegasusHelperPlugin
      */
-    public static function getInstance()
+    public static function getInstance(ilDBInterface $db, ilComponentRepositoryWrite $component_repository, string $id): ilPegasusHelperPlugin
     {
         if (!isset(ilPegasusHelperPlugin::$instance)) {
-            ilPegasusHelperPlugin::$instance = new self();
+            ilPegasusHelperPlugin::$instance = new self($db, $component_repository, $id);
         }
 
         return ilPegasusHelperPlugin::$instance;
     }
 
-    public function __construct()
+    public function __construct(ilDBInterface $db, ilComponentRepositoryWrite $component_repository, string $id)
     {
-        parent::__construct();
+        parent::__construct($db, $component_repository, $id);
 
         /**
          * @var Container $DIC
@@ -50,7 +50,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     /**
      * @return string
      */
-    public function getPluginName()
+    public function getPluginName(): string
     {
         return 'PegasusHelper';
     }
@@ -58,7 +58,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     /**
      * Before update processing
      */
-    protected function beforeUpdate()
+    protected function beforeUpdate(): bool
     {
         if (!$this->plugin->isActive(IL_COMP_SERVICE, 'UIComponent', 'uihk', 'REST')) {
             ilUtil::sendFailure('Please install the ILIAS REST Plugin first!', true);
@@ -70,7 +70,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     /**
      * Before uninstall processing
      */
-    protected function beforeUninstall()
+    protected function beforeUninstall(): bool
     {
         try {
             global $ilDB;

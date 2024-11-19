@@ -23,7 +23,7 @@ use ActiveRecord;
  */
 class UserToken extends ActiveRecord
 {
-    public static function returnDbTableName()
+    public static function returnDbTableName(): string
     {
         return 'ui_uihk_rest_token';
     }
@@ -57,7 +57,7 @@ class UserToken extends ActiveRecord
     /**
      * @return int
      */
-    public function getUserId()
+    public function getUserId(): int
     {
         return $this->user_id;
     }
@@ -66,7 +66,7 @@ class UserToken extends ActiveRecord
     /**
      * @param int $user_id
      */
-    public function setUserId($user_id)
+    public function setUserId($user_id): int
     {
         $this->user_id = $user_id;
     }
@@ -75,7 +75,7 @@ class UserToken extends ActiveRecord
     /**
      * @return string
      */
-    public function getToken()
+    public function getToken(): string
     {
         return $this->token;
     }
@@ -84,7 +84,7 @@ class UserToken extends ActiveRecord
     /**
      * @param string $token
      */
-    public function setToken($token)
+    public function setToken($token): string
     {
         $this->token = $token;
     }
@@ -93,7 +93,7 @@ class UserToken extends ActiveRecord
     /**
      * @return string
      */
-    public function getExpires()
+    public function getExpires(): string
     {
         return $this->expires;
     }
@@ -102,7 +102,7 @@ class UserToken extends ActiveRecord
     /**
      * @param string $expires
      */
-    public function setExpires($expires)
+    public function setExpires($expires): string
     {
         $this->expires = $expires;
     }

@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 
 /**
- * Class ilPegasusHelperConfigGUI
+ * @ilCtrl_IsCalledBy ilPegasusHelperConfigGUI: ilObjComponentSettingsGUI
  */
 final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
 {
@@ -53,7 +53,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
      * invoked by parent
      * @param $cmd string
      */
-    public function performCommand($cmd)
+    public function performCommand($cmd): void
     {
         global $ilTabs, $ilCtrl, $tpl;
         $ilTabs->addSubTab(

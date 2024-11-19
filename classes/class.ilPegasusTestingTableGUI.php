@@ -25,7 +25,7 @@ class ilPegasusTestingTableGUI extends ilTable2GUI
     /**
      * Fill a single data row.
      */
-    protected function fillRow($a_set)
+    protected function fillRow($a_set): void
     {
         if (isset($a_set["category"])) {
             $this->tpl->setCurrentBlock("category");

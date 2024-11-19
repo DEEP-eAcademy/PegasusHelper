@@ -62,7 +62,7 @@ final class ilPegasusHelperUIHookGUI extends ilUIHookPluginGUI
      *
      * @return array
      */
-    public function getHTML($a_comp, $a_part, $a_par = [])
+    public function getHTML($a_comp, $a_part, $a_par = []): array
     {
         $this->handlers->handle();
         return parent::getHTML($a_comp, $a_part, $a_par);
