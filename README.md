@@ -25,7 +25,7 @@ Start at your ILIAS root directory
 ```bash
 mkdir -p Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/  
 cd Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/  
-git clone https://github.com/Jakub-eAcademy/Ilias.RESTPlugin REST
+git clone https://github.com/DEEP-eAcademy/Ilias.RESTPlugin REST
 ```  
 Update and activate the plugin in the ILIAS Plugin Administration.
 ```
@@ -37,7 +37,7 @@ composer-install --no-dev
 Start at your ILIAS root directory 
 ```bash
 cd Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/  
-git clone https://github.com/Jakub-eAcademy/PegasusHelper.git
+git clone https://github.com/DEEP-eAcademy/PegasusHelper.git
 ```
 Update and activate the plugin in the ILIAS Plugin Administration.
 ```
@@ -128,4 +128,4 @@ This project is licensed under the GNU GPLv3 License - see the LICENSE.md file f
 Please create pull requests :fire:
 
 ## Adjustment suggestions / bug reporting :feet:
-Please [read and create issues](https://github.com/Jakub-eAcademy/PegasusHelper/issues) :kissing_heart:
+Please [read and create issues](https://github.com/DEEP-eAcademy/PegasusHelper/issues) :kissing_heart:
