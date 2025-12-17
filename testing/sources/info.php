@@ -50,20 +50,24 @@ function getConnectivityInfo()
     }
 
     $external_host = ""; // TODO setup backend (summarize urls in constants-file?)
-    try {
-        $connectivity_info["external_url"] = httpLoggedRequest($external_host);
-    } catch (Exception $e) {
-        addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");
-    }
+    if (strlen(trim($external_host)) > 0) {
+        try {
+            $connectivity_info["external_url"] = httpLoggedRequest($external_host);
+        } catch (Exception $e) {
+            addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");
+        }
 
-    $external_script = $external_host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/testing/external/run.php";
-    $client = "default"; // TODO get client id
-    try {
-        $urlTestScript = $external_script . "?host=" . urlencode($host);
-        $urlTestScript .= "&client_id=" . urlencode($client);
-        $connectivity_info["external_testing"] = httpLoggedRequest($urlTestScript);
-    } catch (Exception $e) {
-        addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");
+        $external_script = $external_host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/testing/external/run.php";
+        $client = "default"; // TODO get client id
+        try {
+            $urlTestScript = $external_script . "?host=" . urlencode($host);
+            $urlTestScript .= "&client_id=" . urlencode($client);
+            $connectivity_info["external_testing"] = httpLoggedRequest($urlTestScript);
+        } catch (Exception $e) {
+            addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");
+        }
+    } else {
+        addToLog("\n" . $err_msg . "\nExternal host for PegasusHelper testing is not configured.\n");
     }
 
     return $connectivity_info;

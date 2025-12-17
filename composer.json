@@ -13,7 +13,9 @@
     "email": "support@fluxlabs.ch"
   },
   "minimum-stability": "stable",
-  "require": {},
+  "require": {
+    "php": "^8.2"
+  },
   "autoload": {
     "psr-4": {
       "SRAG\\PegasusHelper\\": "classes/"
@@ -31,6 +33,9 @@
     "discard-changes": true,
     "htaccess-protect": true,
     "secure-http": true,
-    "process-timeout": 600
+    "process-timeout": 600,
+    "platform": {
+      "php": "8.2.0"
+    }
   }
 }

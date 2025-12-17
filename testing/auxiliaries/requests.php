@@ -15,6 +15,10 @@
  */
 function httpLoggedRequest($url, $method = "GET", $bodyArr = [], $headerArr = [])
 {
+    if (!is_string($url) || trim($url) === '') {
+        throw new InvalidArgumentException("URL must not be empty");
+    }
+
     $headerArr += [count($bodyArr) ? "Content-Type: application/json" : "User-Agent: srag (testing script)"];
 
     $options = array("http" => array(
