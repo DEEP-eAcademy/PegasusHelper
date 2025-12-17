@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [5.0.0]
+### Added
+- ILIAS 9 support
+- PHP 8.2 requirement
+### Removed
+- Compatibility code for ILIAS versions older than 9
+- PHP 7 support
+### Fixed
+- Replaced deprecated input sanitizing to avoid PHP 8.2 warnings
+- Testing suite no longer calls empty URLs when no external backend is configured
+
 ## [4.0.0]
 ### Added
 - ILIAS 8 Support
