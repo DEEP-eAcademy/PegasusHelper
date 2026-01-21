@@ -5,9 +5,7 @@ namespace SRAG\PegasusHelper\container;
 use ILIAS\DI\Container;
 use SRAG\PegasusHelper\container\exception\DependencyResolutionException;
 use SRAG\PegasusHelper\container\provider\AuthenticationProvider;
-use SRAG\PegasusHelper\container\provider\Ilias53RequestHandlerProvider;
 use SRAG\PegasusHelper\container\provider\Ilias6RequestHandlerProvider;
-use SRAG\PegasusHelper\container\provider\Ilias54RequestHandlerProvider;
 
 /**
  * Class PegasusHelperContainer
@@ -19,9 +17,9 @@ use SRAG\PegasusHelper\container\provider\Ilias54RequestHandlerProvider;
 final class PegasusHelperContainer
 {
     /**
-     * @var Container $container
+     * @var Container|null $container
      */
-    private static $container;
+    private static ?Container $container = null;
 
 
     /**
@@ -31,21 +29,20 @@ final class PegasusHelperContainer
      *
      * @return void
      */
-    public static function bootstrap()
+    public static function bootstrap(): void
     {
         global $DIC;
-        static::$container = $GLOBALS['DIC'];
+        static::$container = $DIC ?? ($GLOBALS['DIC'] ?? null);
+        if (!static::$container instanceof Container) {
+            throw new DependencyResolutionException('The ILIAS DI container is not available.');
+        }
 
         static::$container->register(new AuthenticationProvider());
-        if (version_compare(ILIAS_VERSION_NUMERIC, '6.0', '>=')) {
-            static::$container->register(new Ilias6RequestHandlerProvider());
-        } elseif (version_compare(ILIAS_VERSION_NUMERIC, '5.4', '>=')) {
-            static::$container->register(new Ilias54RequestHandlerProvider());
-        } elseif (version_compare(ILIAS_VERSION_NUMERIC, '5.3', '>=')) {
-            static::$container->register(new Ilias53RequestHandlerProvider());
-        } else {
-            throw new DependencyResolutionException('The pegasus helper plugin has no provider for the current ILIAS version.');
+        if (version_compare(ILIAS_VERSION_NUMERIC, '9.0', '<')) {
+            throw new DependencyResolutionException('The pegasus helper plugin only supports ILIAS 9 or newer.');
         }
+
+        static::$container->register(new Ilias6RequestHandlerProvider());
     }
 
 
@@ -53,8 +50,12 @@ final class PegasusHelperContainer
      * @param string $class
      * @return object
      */
-    public static function resolve($class)
+    public static function resolve(string $class): object
     {
+        if (static::$container === null) {
+            throw new DependencyResolutionException('The pegasus helper container has not been bootstrapped.');
+        }
+
         if (!static::$container->offsetExists($class)) {
             throw new DependencyResolutionException("The class \"$class\" was not found.");
         }

@@ -1,6 +1,7 @@
 <?php
 /* Copyright (c) 1998-2010 ILIAS open source, Extended GPL, see docs/LICENSE */
 
+use ILIAS\DI\Container;
 use SRAG\PegasusHelper\container\PegasusHelperContainer;
 use SRAG\PegasusHelper\handler\ChainRequestHandler;
 use SRAG\PegasusHelper\handler\ExcludedHandler\ExcludedHandler;
@@ -37,10 +38,28 @@ final class ilPegasusHelperUIHookGUI extends ilUIHookPluginGUI
     {
         $this->handlers = PegasusHelperContainer::resolve(ExcludedHandler::class);
         $this->handlers->add(PegasusHelperContainer::resolve(OauthManager::class));
-        $this->handlers->add(PegasusHelperContainer::resolve(RefLinkRedirectHandler::class));
-        $this->handlers->add(PegasusHelperContainer::resolve(NewsLinkRedirectHandler::class));
+
+        if ($this->hasContainerService('ilCtrl')) {
+            $this->handlers->add(PegasusHelperContainer::resolve(RefLinkRedirectHandler::class));
+            $this->handlers->add(PegasusHelperContainer::resolve(NewsLinkRedirectHandler::class));
+        }
+
         $this->handlers->add(PegasusHelperContainer::resolve(LoginPageManager::class));
-        $this->handlers->add(PegasusHelperContainer::resolve(ResourceLinkHandler::class));
+
+        if ($this->hasContainerService('http')) {
+            $this->handlers->add(PegasusHelperContainer::resolve(ResourceLinkHandler::class));
+        }
+    }
+
+    private function hasContainerService(string $key): bool
+    {
+        if (PHP_SAPI === 'cli') {
+            return false;
+        }
+
+        global $DIC;
+
+        return ($DIC instanceof Container) && $DIC->offsetExists($key);
     }
 
     /**

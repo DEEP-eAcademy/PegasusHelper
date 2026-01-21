@@ -65,12 +65,14 @@ final class ResourceLinkHandlerImpl extends BaseHandler implements ResourceLinkH
 	 * @return boolean true if this handler needs to handle the request, otherwise false
 	 */
 	public function isHandler() {
-		$target = filter_input(INPUT_GET, self::GET_TARGET, FILTER_UNSAFE_RAW, ['flags' => FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH]);
+		$query = $this->http->request()->getQueryParams();
+		$target = $query[self::GET_TARGET] ?? null;
+		$target = is_string($target) ? $target : '';
 
 		return
-			array_key_exists('token', $_GET) &&
-			array_key_exists('user', $_GET) &&
-			array_key_exists('target', $_GET) &&
+			array_key_exists(self::GET_TOKEN, $query) &&
+			array_key_exists(self::GET_USER, $query) &&
+			array_key_exists(self::GET_TARGET, $query) &&
 			is_string($target) &&
 			$target === 'ilias_app_resource';
 	}
