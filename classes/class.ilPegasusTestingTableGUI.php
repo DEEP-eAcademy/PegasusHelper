@@ -14,7 +14,7 @@ class ilPegasusTestingTableGUI extends ilTable2GUI
         $this->disable('sort');
         $this->disable('numinfo');
         $this->setLimit(100);
-        $this->setRowTemplate("tpl.pegasus_testing_row.html", "./Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/classes");
+        $this->setRowTemplate("tpl.pegasus_testing_row.html", "public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/classes");
 
         $this->addColumn("", "status", "5%");
         $this->addColumn("<b>" . ucfirst($primary_column_name) . "</b>", "test", "30%");

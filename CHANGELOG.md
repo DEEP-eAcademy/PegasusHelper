@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Removed hardcoded `require_once`/`include_once` paths to core ILIAS classes (`ilColorPickerInputGUI`, `ilRadioGroupInputGUI`, `ilRadioOption`, `ilTable2GUI`, `ilWebAccessCheckerDelivery`) that broke under ILIAS 10's reorganized directory structure (`Services`/`Modules` moved into `components/ILIAS/*`); these classes are autoloaded already
 - Testing suite now resolves `ilias.ini.php` and the ILIAS version file from the installation root, which in ILIAS 10 sits one level above the `public/` web root
 - Missing `ilUtil` import in the reference-link timeline redirect handler
+- `PegasusHelperContainer::bootstrap()` no longer throws when `$DIC` isn't available; ILIAS 10's ctrl-structure build tooling `require_once`s plugin GUI class files outside of a real request, which crashed on the old unconditional bootstrap and silently broke the ctrl_structure artifact for the whole installation
+- Template/row-template module paths in `ilPegasusHelperConfigGUI` and `ilPegasusTestingTableGUI` now include the `public/` prefix; ILIAS 10's `ilTemplate::getTemplatePath()` resolves module-relative template dirs against the installation root (above `public/`), not the web root
 
 ## [5.0.0]
 ### Added

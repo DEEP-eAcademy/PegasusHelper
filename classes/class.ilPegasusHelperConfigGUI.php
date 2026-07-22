@@ -192,7 +192,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         }
 
         // preview
-        $thisDir = "Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/classes";
+        $thisDir = "public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/classes";
         $tpl = new ilTemplate("tpl.theme_example.html", true, true, $thisDir);
         $tpl->setVariable('EX_TEXT', "&nbsp;ILIAS Pegasus&nbsp;");
         $tpl->setVariable('COLOR_PRIMARY', $primaryColor);
@@ -236,7 +236,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
 
         foreach (ilPegasusHelperConfigGUI::$ICON_CATEGORIES as $category) {
             // current item
-            $thisDir = "Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/classes";
+            $thisDir = "public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/classes";
             $clientName = CLIENT_ID;
             $webDir = "data/$clientName/";
             $tpl = new ilTemplate("tpl.icon.html", true, true, $thisDir);
