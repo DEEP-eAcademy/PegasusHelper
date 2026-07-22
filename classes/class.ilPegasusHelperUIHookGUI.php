@@ -10,7 +10,6 @@ use SRAG\PegasusHelper\handler\NewsLinkRedirectHandler\NewsLinkRedirectHandler;
 use SRAG\PegasusHelper\handler\OAuthManager\OAuthManager;
 use SRAG\PegasusHelper\handler\OAuthManager\v52\OauthManagerImpl;
 use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\RefLinkRedirectHandler;
-use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\v52\RefLinkRedirectHandlerImpl;
 use SRAG\PegasusHelper\handler\ResourceLinkHandler\ResourceLinkHandler;
 
 require_once __DIR__ . '/../bootstrap.php';
@@ -67,7 +66,7 @@ final class ilPegasusHelperUIHookGUI extends ilUIHookPluginGUI
      * If its a specific request, the appropriate handler is called.
      *
      * @see OauthManagerImpl
-     * @see RefLinkRedirectHandlerImpl
+     * @see RefLinkRedirectHandler
      *
      * If the {@link OauthManager->authenticate()} is executed, this
      * method will return the data for Oauth2 as a hidden input in the response body.

@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [6.0.0]
+### Added
+- ILIAS 10 support
+### Removed
+- Compatibility code for ILIAS versions older than 10 (dead ILIAS 5.3/5.4-era provider and handler classes that were no longer wired up)
+### Fixed
+- Removed hardcoded `require_once`/`include_once` paths to core ILIAS classes (`ilColorPickerInputGUI`, `ilRadioGroupInputGUI`, `ilRadioOption`, `ilTable2GUI`, `ilWebAccessCheckerDelivery`) that broke under ILIAS 10's reorganized directory structure (`Services`/`Modules` moved into `components/ILIAS/*`); these classes are autoloaded already
+- Testing suite now resolves `ilias.ini.php` and the ILIAS version file from the installation root, which in ILIAS 10 sits one level above the `public/` web root
+- Missing `ilUtil` import in the reference-link timeline redirect handler
+
 ## [5.0.0]
 ### Added
 - ILIAS 9 support

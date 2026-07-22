@@ -4,6 +4,7 @@ namespace SRAG\PegasusHelper\handler\RefLinkRedirectHandler\v54;
 
 use ilLink;
 use ilObject2;
+use ilUtil;
 use SRAG\PegasusHelper\authentication\UserTokenAuthenticator;
 use SRAG\PegasusHelper\handler\BaseHandler;
 use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\RefLinkRedirectHandler;

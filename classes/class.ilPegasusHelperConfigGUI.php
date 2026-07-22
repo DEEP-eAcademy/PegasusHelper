@@ -203,15 +203,12 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $form->addItem($themeExample);
 
         // primary color
-        require_once("./Services/Form/classes/class.ilColorPickerInputGUI.php");
         $primaryInput = new ilColorPickerInputGUI($this->pl->txt("txt_primary_color"), "primary_color");
         $primaryInput->setInfo($this->pl->txt("txt_info_primary_color"));
         $primaryInput->setValue($primaryColor);
         $form->addItem($primaryInput);
 
         // contrast color
-        require_once("./Services/Form/classes/class.ilRadioGroupInputGUI.php");
-        require_once("./Services/Form/classes/class.ilRadioOption.php");
         $contrastInput = new ilRadioGroupInputGUI($this->pl->txt("txt_contrast"), "contrast_color");
         $contrastInput->setInfo($this->pl->txt("txt_info_contrast"));
         $contrastInput->addOption(new ilRadioOption($this->pl->txt("button_white"), 1));

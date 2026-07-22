@@ -115,7 +115,6 @@ final class ResourceLinkHandlerImpl extends BaseHandler implements ResourceLinkH
 	 * further action is possible after this method.
 	 */
 	private function invokeWebAccessChecker() {
-		require_once('./Services/WebAccessChecker/classes/class.ilWebAccessCheckerDelivery.php');
 		ilWebAccessCheckerDelivery::run($this->http, $this->cookieFactory);
 	}
 }

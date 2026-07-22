@@ -15,7 +15,7 @@ Features:
 - Basic plugin setup tests which verify your local ILIAS configuration
 
 ## Requirements
-* Version: ILIAS 9
+* Version: ILIAS 10
 * PHP 8.2
 
 ## Installation

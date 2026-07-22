@@ -27,15 +27,23 @@ final class PegasusHelperContainer
      * This method requires an registered autoloader and
      * the already bootstrapped ILIAS DI container.
      *
+     * Silently does nothing if the ILIAS DI container isn't available yet.
+     * This file is `require_once`d at the top of every plugin class file
+     * (including plain GUI classes), and ILIAS's ctrl-structure build tooling
+     * loads those files via reflection outside of a real request, with no
+     * `$DIC` in scope. Throwing here would abort that unrelated, unconnected
+     * process; {@see resolve()} is what actually enforces bootstrap state.
+     *
      * @return void
      */
     public static function bootstrap(): void
     {
         global $DIC;
-        static::$container = $DIC ?? ($GLOBALS['DIC'] ?? null);
-        if (!static::$container instanceof Container) {
-            throw new DependencyResolutionException('The ILIAS DI container is not available.');
+        $container = $DIC ?? ($GLOBALS['DIC'] ?? null);
+        if (!$container instanceof Container) {
+            return;
         }
+        static::$container = $container;
 
         static::$container->register(new AuthenticationProvider());
         if (version_compare(ILIAS_VERSION_NUMERIC, '9.0', '<')) {

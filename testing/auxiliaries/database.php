@@ -30,7 +30,7 @@ function initIlDB()
 
 function getClientInfo()
 {
-    $clients_info = parse_ini_file(getRootIlias() . "/ilias.ini.php", true)["clients"];
+    $clients_info = parse_ini_file(getRootIliasConfig() . "/ilias.ini.php", true)["clients"];
     $clients = glob(getRootIlias() . "/" . $clients_info["path"] . "/*", GLOB_ONLYDIR);
     if (count($clients) === 0) {
         throw new Exception("Unable to get client information from '/ilias.ini.php'");

@@ -40,7 +40,7 @@ function getConnectivityInfo()
     $err_msg = "WARNING unable to get some Information about the connectivity";
 
     try {
-        $host = parse_ini_file(getRootIlias() . "/ilias.ini.php", true)["server"]["http_path"];
+        $host = parse_ini_file(getRootIliasConfig() . "/ilias.ini.php", true)["server"]["http_path"];
         $url_rest = $host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/REST";
 
         $url_login = $url_rest . "/apps/admin";
@@ -79,7 +79,7 @@ function getILIASInfo()
     $err_msg = "WARNING unable to get some Information about ILIAS";
 
     try {
-        include_once getRootIlias() . "/include/inc.ilias_version.php";
+        include_once getRootIliasConfig() . "/ilias_version.php";
         $ilias_info["version"] = ILIAS_VERSION_NUMERIC;
 
         $ilias_info["available"] = true;
@@ -89,7 +89,7 @@ function getILIASInfo()
     }
 
     try {
-        $ilias_info["ilias_ini"] = parse_ini_file(getRootIlias() . "/ilias.ini.php", true);
+        $ilias_info["ilias_ini"] = parse_ini_file(getRootIliasConfig() . "/ilias.ini.php", true);
         $ilias_info["ilias_ini"]["available"] = true;
     } catch (Exception $e) {
         addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");

@@ -9,6 +9,16 @@ function getRootIlias()
     return isset($GLOBALS["ilias"]) ? "." : "../../../../../../../..";
 }
 
+/**
+ * ILIAS 10 serves requests from the "public" directory, which is one level
+ * below the actual installation root. ilias.ini.php and ilias_version.php
+ * live in that installation root, one level above {@see getRootIlias()}.
+ */
+function getRootIliasConfig()
+{
+    return getRootIlias() . "/..";
+}
+
 function getRootPlugins()
 {
     return getRootIlias() . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook";
