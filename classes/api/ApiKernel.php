@@ -28,6 +28,15 @@ final class ApiKernel
         }
 
         try {
+            // Must happen before ApiInitialisation is referenced at all, below:
+            // that class declares `extends \ilInitialisation`, and PHP resolves
+            // an "extends" clause the moment it compiles the file (triggered by
+            // autoloading on first reference), not lazily once some method of
+            // it actually runs. Without ILIAS's own classmap loaded yet, that
+            // resolution fails with "Class ilInitialisation not found" before
+            // boot() ever starts.
+            self::loadIliasAutoloader();
+
             $request = Request::fromGlobals();
 
             ApiInitialisation::boot(self::peekClientId($request));
@@ -54,6 +63,41 @@ final class ApiKernel
             self::logError($e);
             self::sendError(500, ['cause' => 'Internal Server Error']);
         }
+    }
+
+    /**
+     * Locates ILIAS's public webroot (the directory containing `ilias.php`)
+     * by walking up from this file's location, and requires that
+     * installation's own composer autoloader.
+     *
+     * This duplicates {@see ApiInitialisation}'s own (private) copy of the same
+     * walk-up logic, which it separately needs for `chdir()`, defining
+     * `ILIAS_ABSOLUTE_PATH`, and reading `ilias.ini.php`. The duplication is
+     * deliberate: that logic can't be shared by calling into
+     * `ApiInitialisation` here, because merely referencing that class is
+     * exactly what needs ILIAS's autoloader to already be loaded (see the call
+     * site in {@see run()}) -- this class must have no such dependency itself.
+     */
+    private static function loadIliasAutoloader(): void
+    {
+        $dir = __DIR__;
+        for ($i = 0; $i < 20; $i++) {
+            if (is_file($dir . '/ilias.php')) {
+                $autoloader = dirname($dir) . '/vendor/composer/vendor/autoload.php';
+                if (is_file($autoloader)) {
+                    require_once $autoloader;
+                }
+
+                return;
+            }
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+
+        throw new \RuntimeException('Could not locate the ILIAS public/ webroot above ' . __DIR__);
     }
 
     /**
