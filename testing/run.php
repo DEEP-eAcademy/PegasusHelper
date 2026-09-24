@@ -1,7 +1,7 @@
 <?php
 
 /**
- * performs tests for troubleshooting the installation of the REST- and PegasusHelper-plugins
+ * performs tests for troubleshooting the installation of the PegasusHelper plugin
  * run the script as "php run.php" from the commandline
  *
  * @author Marc Schneiter <msc@studer-raimann.ch>
@@ -13,8 +13,8 @@ include_once "includefile.php";
 
 initPegasusHelperCLI();
 
-printNormal("Diagnostics for REST- and PegasusHelper-plugins\n");
-printNormal("===============================================\n");
+printNormal("Diagnostics for the PegasusHelper plugin\n");
+printNormal("=========================================\n");
 
 printNormal("do you want to run external tests [y/n]? ");
 $handle = fopen("php://stdin", "r");

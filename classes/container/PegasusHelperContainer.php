@@ -4,6 +4,7 @@ namespace SRAG\PegasusHelper\container;
 
 use ILIAS\DI\Container;
 use SRAG\PegasusHelper\container\exception\DependencyResolutionException;
+use SRAG\PegasusHelper\container\provider\ApiProvider;
 use SRAG\PegasusHelper\container\provider\AuthenticationProvider;
 use SRAG\PegasusHelper\container\provider\Ilias6RequestHandlerProvider;
 
@@ -21,6 +22,12 @@ final class PegasusHelperContainer
      */
     private static ?Container $container = null;
 
+    /**
+     * @var bool true once the providers have actually been registered (as opposed
+     *           to a no-op call made before $DIC existed)
+     */
+    private static bool $bootstrapped = false;
+
 
     /**
      * Bootstraps the plugin dependency container, with all service providers.
@@ -34,10 +41,22 @@ final class PegasusHelperContainer
      * `$DIC` in scope. Throwing here would abort that unrelated, unconnected
      * process; {@see resolve()} is what actually enforces bootstrap state.
      *
+     * Idempotent once it has actually registered the providers: `api.php` calls
+     * this explicitly right after it boots ILIAS itself (see
+     * {@see \SRAG\PegasusHelper\api\ApiInitialisation::boot()}), in addition to
+     * the unconditional call already made by every plugin class file via
+     * `bootstrap.php`. Re-registering would otherwise risk a Pimple
+     * FrozenServiceException for any service that had already been resolved
+     * between the two calls.
+     *
      * @return void
      */
     public static function bootstrap(): void
     {
+        if (static::$bootstrapped) {
+            return;
+        }
+
         global $DIC;
         $container = $DIC ?? ($GLOBALS['DIC'] ?? null);
         if (!$container instanceof Container) {
@@ -51,6 +70,9 @@ final class PegasusHelperContainer
         }
 
         static::$container->register(new Ilias6RequestHandlerProvider());
+        static::$container->register(new ApiProvider());
+
+        static::$bootstrapped = true;
     }
 
 

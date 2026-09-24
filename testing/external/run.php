@@ -3,7 +3,6 @@
 $internal_log = "request @ " . date("Y-m-d H:i:s") . PHP_EOL;
 try {
     $internal_log .= "host   : " . $_GET["host"] . PHP_EOL;
-    $internal_log .= "client : " . $_GET["client_id"] . PHP_EOL;
     $log = performTest();
     setResponse($log);
     $internal_log .= "RESULT : " . print_r($log, true) . PHP_EOL;
@@ -20,12 +19,14 @@ file_put_contents("check.log", $internal_log . PHP_EOL . PHP_EOL, FILE_APPEND);
  */
 function performTest()
 {
-    $clientId = $_GET["client_id"];
     $host = $_GET["host"];
-    $api = $host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/REST/api.php";
-    $url = $api . "/v1/tests/routesAccess?client_id=" . $clientId;
+    $api = $host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/api.php";
+    // Any reachable, unauthenticated route works here: the point is only to prove
+    // that this externally-hosted script can reach the PegasusHelper API at all.
+    // A 401 (missing access token) is the expected, successful result.
+    $url = $api . "/v2/ilias-app/desktop";
 
-    $log = httpLoggedRequest($url, "GET", ["dat" => "test"], []);
+    $log = httpLoggedRequest($url, "GET", [], []);
     $log["host"] = "https://" . $_SERVER["HTTP_HOST"] . "//" . $_SERVER["REQUEST_URI"];
 
     return $log;

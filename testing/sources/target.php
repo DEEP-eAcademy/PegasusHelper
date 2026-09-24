@@ -9,7 +9,6 @@ function getTargetInfo($info)
     return [
         "TestScript" => getTestScriptTargetInfo(),
         "ILIAS" => getILIASTargetInfo($info),
-        "REST" => getPluginTargetInfo("REST", "Ilias.RESTPlugin"),
         "PegasusHelper" => getPluginTargetInfo("PegasusHelper", "PegasusHelper")
     ];
 }
@@ -29,8 +28,8 @@ function getILIASTargetInfo($info)
     $err_msg = "WARNING unable to get some Information about ILIAS";
 
     try {
-        $ilias_target["min_version"] = higherStrVersion($info["REST"]["ilias_min_version"], $info["PegasusHelper"]["ilias_min_version"]);
-        $ilias_target["max_version"] = lowerStrVersion($info["REST"]["ilias_max_version"], $info["PegasusHelper"]["ilias_max_version"]);
+        $ilias_target["min_version"] = $info["PegasusHelper"]["ilias_min_version"];
+        $ilias_target["max_version"] = $info["PegasusHelper"]["ilias_max_version"];
 
         $ilias_target["available"] = true;
     } catch (Exception $e) {

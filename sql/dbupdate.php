@@ -1,41 +1,20 @@
 <#1>
 <?php
-
-require_once './Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/bootstrap.php';
-
-$rest = new SRAG\PegasusHelper\rest\RestSetup();
-$rest->setupClient();
-
+// No-op since PegasusHelper 7.0.0: this step used to configure the ILIAS REST
+// plugin's "ilias_pegasus" API client. PegasusHelper is now self-contained; see
+// steps #12-#16 below for its own OAuth client/token setup and migration.
 ?>
 <#2>
 <?php
-
-require_once './Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/bootstrap.php';
-
-$token = new SRAG\PegasusHelper\rest\TokenParam(3600000, SRAG\PegasusHelper\rest\TokenType::ACCESS_TOKEN);
-
-$rest = new SRAG\PegasusHelper\rest\RestSetup();
-$rest->configTTL($token);
+// No-op since PegasusHelper 7.0.0 (used to set the REST plugin's access_token_ttl).
 ?>
 <#3>
 <?php
-
-require_once './Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/bootstrap.php';
-
-$token = new SRAG\PegasusHelper\rest\TokenParam(4500000, SRAG\PegasusHelper\rest\TokenType::REFRESH_TOKEN);
-
-$rest = new SRAG\PegasusHelper\rest\RestSetup();
-$rest->configTTL($token);
+// No-op since PegasusHelper 7.0.0 (used to set the REST plugin's refresh_token_ttl).
 ?>
 <#4>
 <?php
-
-require_once './Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/bootstrap.php';
-
-$route = new SRAG\PegasusHelper\rest\RouteParam("/v1/files/:id", "GET");
-
-$rest = new SRAG\PegasusHelper\rest\RestSetup();
-$rest->addRoute($route);
+// No-op since PegasusHelper 7.0.0 (used to whitelist GET /v1/files/:id on the REST plugin's client).
 ?>
 <#5>
 <?php
@@ -149,4 +128,119 @@ $ilDB->update("ui_uihk_pegasus_theme", $values, $where);
 <#11>
 <?php
 ilPegasusHelperConfigGUI::copyDefaultIcons();
+?>
+<#12>
+<?php
+// Settings for the plugin's own OAuth2 implementation, replacing the ILIAS
+// REST plugin's "ui_uihk_rest_config" table (see step #15 for the migration).
+global $ilDB;
+$fields = array(
+    'setting_name' => array(
+        'type' => 'text',
+        'length' => 128,
+        'notnull' => true
+    ),
+    'setting_value' => array(
+        'type' => 'text',
+        'length' => 512,
+        'notnull' => false
+    )
+);
+$ilDB->createTable('ui_uihk_pegasus_config', $fields);
+$ilDB->addPrimaryKey('ui_uihk_pegasus_config', array('setting_name'));
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #12: Created ui_uihk_pegasus_config.');
+?>
+<#13>
+<?php
+// Tracks issued refresh tokens, replacing the REST plugin's "ui_uihk_rest_refresh"
+// (see step #16 for the migration). Access tokens are stateless and are not
+// tracked in a table.
+global $ilDB;
+$fields = array(
+    'id' => array(
+        'type' => 'integer',
+        'length' => 4,
+        'notnull' => true
+    ),
+    'token_hash' => array(
+        'type' => 'text',
+        'length' => 64,
+        'fixed' => true,
+        'notnull' => true
+    ),
+    'user_id' => array(
+        'type' => 'integer',
+        'length' => 4,
+        'notnull' => true
+    ),
+    'created' => array(
+        'type' => 'timestamp',
+        'notnull' => true
+    ),
+    'last_refresh' => array(
+        'type' => 'timestamp',
+        'notnull' => true
+    ),
+    'refreshes' => array(
+        'type' => 'integer',
+        'length' => 4,
+        'notnull' => true,
+        'default' => 0
+    )
+);
+$ilDB->createTable('ui_uihk_pegasus_refresh', $fields);
+$ilDB->addPrimaryKey('ui_uihk_pegasus_refresh', array('id'));
+$ilDB->createSequence('ui_uihk_pegasus_refresh');
+$ilDB->addUniqueConstraint('ui_uihk_pegasus_refresh', array('token_hash'), 'uc1');
+$ilDB->addIndex('ui_uihk_pegasus_refresh', array('created'), 'i1');
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #13: Created ui_uihk_pegasus_refresh.');
+?>
+<#14>
+<?php
+// Short-lived, one-time SSO auth-tokens for opening ILIAS pages/resources from
+// the app, replacing the REST plugin's "ui_uihk_rest_token" (and the plugin's
+// own removed entity\UserToken ActiveRecord, which used the same table name).
+global $ilDB;
+$fields = array(
+    'token' => array(
+        'type' => 'text',
+        'length' => 128,
+        'notnull' => true
+    ),
+    'user_id' => array(
+        'type' => 'integer',
+        'length' => 4,
+        'notnull' => true
+    ),
+    'expires' => array(
+        'type' => 'timestamp',
+        'notnull' => true
+    )
+);
+$ilDB->createTable('ui_uihk_pegasus_token', $fields);
+$ilDB->addPrimaryKey('ui_uihk_pegasus_token', array('token'));
+$ilDB->addIndex('ui_uihk_pegasus_token', array('user_id'), 'i1');
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #14: Created ui_uihk_pegasus_token.');
+?>
+<#15>
+<?php
+// Copies the "ilias_pegasus" client's secret, the token signing salt and the
+// token TTLs from the ILIAS REST plugin, if it is still installed; otherwise
+// generates fresh values. Must run before #16 (which needs the copied salt to
+// recognize migrated refresh tokens).
+global $ilDB;
+(new SRAG\PegasusHelper\migration\RestPluginMigration($ilDB))->migrateSettings();
+?>
+<#16>
+<?php
+// Migrates the REST plugin's live refresh tokens, so app installations that
+// are already logged in stay logged in after the switch.
+global $ilDB;
+(new SRAG\PegasusHelper\migration\RestPluginMigration($ilDB))->migrateRefreshTokens();
 ?>

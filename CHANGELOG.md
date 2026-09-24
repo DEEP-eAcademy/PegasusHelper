@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [7.0.0]
+### Added
+- Self-contained JSON API at `api.php`, serving every route the ILIAS-Pegasus
+  app needs (login token issuing/refresh, repository objects, files, news,
+  theme, learning modules) -- the plugin no longer depends on, configures, or
+  calls the third-party ILIAS REST plugin
+- Database migration that copies the `ilias_pegasus` API secret, token signing
+  salt, token lifetimes and live refresh tokens out of the REST plugin's
+  tables on update, so app installations that are already logged in stay
+  logged in
+- Editable API secret and API endpoint URL shown on the plugin's 'General'
+  configuration tab
+### Changed
+- The app now calls `.../UserInterfaceHook/PegasusHelper/api.php` instead of
+  `.../UserInterfaceHook/REST/api.php`; see the README for the recommended
+  upgrade order and a rewrite-rule example to keep older app builds working
+- `GET /v2/ilias-app/auth-token` now returns a proper JSON object (`{"token":
+  "..."}`) instead of a JSON-encoded string containing JSON
+### Removed
+- `beforeUpdate()` no longer requires the ILIAS REST plugin to be installed
+- `classes/rest/*` (`RestSetup`, `TokenParam`, `RouteParam`, `TokenType`) and
+  the `entity\UserToken` ActiveRecord model, replaced by
+  `oauth\TokenService`/`TokenCodec` and `authentication\AuthTokenRepository`
+### Fixed
+- SSO auth-tokens (used to open ILIAS pages/resources from the app) are now
+  drawn from a CSPRNG and several can be valid per user at once, instead of the
+  REST plugin's predictable, single-token-per-user scheme
+- Refresh tokens, the token signing salt and the API secret are now compared
+  with `hash_equals()`
+
 ## [6.0.0]
 ### Added
 - ILIAS 10 support

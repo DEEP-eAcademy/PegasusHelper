@@ -12,8 +12,10 @@ function getInfo()
     $info["TestScript"] = getTestScriptInfo($ilDB_handle);
     $info["Connectivity"] = getConnectivityInfo();
     $info["ILIAS"] = getILIASInfo();
-    $info["REST"] = getPluginInfo("REST", "rest", $ilDB_handle);
     $info["PegasusHelper"] = getPluginInfo("PegasusHelper", "sragpegasushelper", $ilDB_handle);
+    // Only used to warn if the (no longer required) REST plugin is still active;
+    // gracefully degrades to "not available" once its directory/DB entry is gone.
+    $info["RestPluginLegacy"] = getPluginInfo("REST", "rest", $ilDB_handle);
     closeIlDB($ilDB_handle);
 
     return $info;
@@ -41,10 +43,14 @@ function getConnectivityInfo()
 
     try {
         $host = parse_ini_file(getRootIliasConfig() . "/ilias.ini.php", true)["server"]["http_path"];
-        $url_rest = $host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/REST";
+        $url_api = $host . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/api.php/v2/ilias-app/desktop";
 
-        $url_login = $url_rest . "/apps/admin";
-        $connectivity_info["rest_login"] = httpLoggedRequest($url_login);
+        // A GET with no Authorization header must be rejected (401, "missing").
+        $connectivity_info["api_no_token"] = httpLoggedRequest($url_api);
+        // A GET with a bogus (but present) Authorization header must be rejected
+        // for a *different* reason (401, "invalid") -- proving the header actually
+        // reached PHP, which some server/proxy configurations strip.
+        $connectivity_info["api_bad_token"] = httpLoggedRequest($url_api, "GET", [], ["Authorization: Bearer not-a-real-token"]);
     } catch (Exception $e) {
         addToLog("\n" . $err_msg . "\n" . $e->getMessage() . "\n");
     }

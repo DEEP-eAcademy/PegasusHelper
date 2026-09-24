@@ -20,6 +20,7 @@ use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\RefLinkRedirectHandler;
 use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\v54\RefLinkRedirectHandlerImpl;
 use SRAG\PegasusHelper\handler\ResourceLinkHandler\ResourceLinkHandler;
 use SRAG\PegasusHelper\handler\ResourceLinkHandler\v53\ResourceLinkHandlerImpl;
+use SRAG\PegasusHelper\oauth\TokenService;
 
 /**
  * Class PegasusHelperIlias52Provider
@@ -49,7 +50,7 @@ final class Ilias6RequestHandlerProvider implements ServiceProviderInterface
         });
 
         $pimple[OAuthManager::class] = $pimple->factory(function ($c) {
-            return new OauthManagerImpl();
+            return new OauthManagerImpl($c[TokenService::class]);
         });
 
         $pimple[RefLinkRedirectHandler::class] = $pimple->factory(function ($c) {

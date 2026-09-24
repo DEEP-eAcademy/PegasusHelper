@@ -49,34 +49,22 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
     }
 
     /**
-     * Before update processing
-     */
-    protected function beforeUpdate(): bool
-    {
-        global $DIC, $tpl;
-        if (!$DIC["component.repository"]->hasActivatedPlugin("rest")) {
-            $tpl->setOnScreenMessage( 'failure', 'Please install the ILIAS REST Plugin first!', true);
-            return false;
-        }
-        return true;
-    }
-
-    /**
      * Before uninstall processing
+     *
+     * PegasusHelper is self-contained since version 7.0.0: it no longer depends
+     * on (or configures) the ILIAS REST plugin, so this only drops the plugin's
+     * own tables.
      */
     protected function beforeUninstall(): bool
     {
         try {
             global $ilDB, $tpl;
-            $ilDB->dropTable("ui_uihk_pegasus_theme", false);
+            $error_if_not_existing = false;
+            $ilDB->dropTable("ui_uihk_pegasus_theme", $error_if_not_existing);
+            $ilDB->dropTable("ui_uihk_pegasus_config", $error_if_not_existing);
+            $ilDB->dropTable("ui_uihk_pegasus_refresh", $error_if_not_existing);
+            $ilDB->dropTable("ui_uihk_pegasus_token", $error_if_not_existing);
 
-            global $DIC;
-            if (!$DIC["component.repository"]->hasActivatedPlugin("rest")) {
-                require_once './Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/bootstrap.php';
-
-                $rest = new SRAG\PegasusHelper\rest\RestSetup();
-                $rest->deleteClient();
-            }
             return true;
         } catch (Exception $e) {
             $tpl->setOnScreenMessage( 'failure', "There was a problem when uninstalling the PegasuHelper plugin", true);

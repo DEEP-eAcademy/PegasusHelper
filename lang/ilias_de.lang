@@ -4,6 +4,12 @@ tab_testing#:#Tests
 tab_statistics#:#Statistik
 form_api_secret#:#ILIAS Pegasus API Benutzer
 form_token_statistics#:#Token
+txt_api_endpoint#:#API-Endpunkt
+txt_api_key#:#API-Schlüssel
+txt_api_secret#:#API-Geheimnis
+txt_info_api_secret#:#Muss mit dem in der ILIAS Pegasus App konfigurierten Geheimnis übereinstimmen. Nur ändern, wenn die App mit einem abweichenden Geheimnis konfiguriert wurde.
+msg_api_secret_saved#:#Das API-Geheimnis wurde gespeichert
+msg_api_secret_not_saved#:#Das API-Geheimnis konnte nicht gespeichert werden. Es darf nicht leer sein
 form_coloring#:#Farbwahl
 form_icon#:#Icons
 button_reset#:#Zurücksetzen

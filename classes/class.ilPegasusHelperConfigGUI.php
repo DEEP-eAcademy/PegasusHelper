@@ -103,6 +103,9 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
             case "theme_reset_icons":
                 $this->resetIcons();
                 break;
+            case "general_save_secret":
+                $this->saveApiSecret();
+                break;
             case "general":
             default:
                 $ilTabs->setSubTabActive("id_general");
@@ -112,28 +115,59 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
     }
 
     /**
-     * html of form for API-secret
+     * html of form for the API endpoint and the ilias_pegasus API secret
      * @return string
      */
     protected function getApiSecretFormHtml()
     {
-        global $ilDB;
-        $formApiUser = new ilPropertyFormGUI();
-        if ($ilDB->tableExists("ui_uihk_rest_client")) {
-            $api_key = 'ilias_pegasus';
-            $sql = "SELECT api_secret FROM ui_uihk_rest_client WHERE api_key = '$api_key'";
-            $set = $ilDB->query($sql);
-            while ($rec = $ilDB->fetchAssoc($set)) {
-                $api_secret = $rec['api_secret'];
-            }
+        global $ilDB, $ilCtrl;
 
-            $formApiUser->setTitle($this->pl->txt("form_api_secret"));
-            $gui = new ilNonEditableValueGUI($api_key);
-            $gui->setValue($api_secret);
-            $formApiUser->addItem($gui);
+        $settings = new \SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
+
+        $form = new ilPropertyFormGUI();
+        $form->setTitle($this->pl->txt("form_api_secret"));
+        $form->setFormAction($ilCtrl->getFormAction($this));
+
+        $endpoint = new ilNonEditableValueGUI($this->pl->txt("txt_api_endpoint"));
+        $endpoint->setValue(
+            ILIAS_HTTP_PATH . "/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/api.php"
+        );
+        $form->addItem($endpoint);
+
+        $apiKey = new ilNonEditableValueGUI($this->pl->txt("txt_api_key"));
+        $apiKey->setValue($settings->getApiKey());
+        $form->addItem($apiKey);
+
+        $apiSecret = new ilTextInputGUI($this->pl->txt("txt_api_secret"), "api_secret");
+        $apiSecret->setInfo($this->pl->txt("txt_info_api_secret"));
+        $apiSecret->setValue($settings->getApiSecret());
+        $apiSecret->setRequired(true);
+        $form->addItem($apiSecret);
+
+        $form->addCommandButton("general_save_secret", $this->pl->txt("button_save"));
+
+        return $form->getHTML();
+    }
+
+    /**
+     * saves the (admin-editable) ilias_pegasus API secret
+     */
+    protected function saveApiSecret()
+    {
+        global $ilDB, $ilCtrl, $tpl;
+
+        $secret = trim($_POST["api_secret"] ?? "");
+        if ($secret === "") {
+            $tpl->setOnScreenMessage('failure', $this->pl->txt("msg_api_secret_not_saved"), true);
+            $ilCtrl->redirect($this, "general");
+            return;
         }
 
-        return $formApiUser->getHTML();
+        $settings = new \SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
+        $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_API_SECRET, $secret);
+
+        $tpl->setOnScreenMessage('success', $this->pl->txt("msg_api_secret_saved"), true);
+        $ilCtrl->redirect($this, "general");
     }
 
     /**
@@ -142,6 +176,9 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
      */
     protected function getTokenStatisticsHtml()
     {
+        global $ilDB;
+        $refreshTokens = new \SRAG\PegasusHelper\oauth\RefreshTokenRepository($ilDB);
+
         $formTokensStatistics = new ilPropertyFormGUI();
         $formTokensStatistics->setTitle($this->pl->txt("form_token_statistics"));
 
@@ -153,13 +190,8 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         ];
 
         foreach ($differences as $label => $dd) {
-            global $ilDB;
-            $sql = "SELECT COUNT(*) FROM ui_uihk_rest_refresh WHERE datediff(NOW(), created) < $dd";
-            $set = $ilDB->query($sql);
-            $counts = current($ilDB->fetchAssoc($set));
-
             $gui = new ilNonEditableValueGUI($label);
-            $gui->setValue($counts);
+            $gui->setValue($refreshTokens->countCreatedWithinDays($dd));
             $formTokensStatistics->addItem($gui);
         }
 

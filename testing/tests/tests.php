@@ -25,7 +25,6 @@ function getInternalTestSuite($context)
     $general = new TestCategory("General");
     $general->addTests([
         new Test("location where script is run", "testWorkingDirectory", true, [TestingContext::C_CLI]),
-        new Test("location of REST-plugin", "testRESTDirectory"),
         new Test("location of PegasusHelper-plugin", "testPegasusHelperDirectory"),
         new Test("connection to ILIAS-database", "testIlBDConnection", false, [TestingContext::C_CLI]),
         new Test("compatible PHP-version", "testPhpVersion", false)
@@ -39,20 +38,8 @@ function getInternalTestSuite($context)
     ]);
     $suite->addCategories($ilias);
 
-    $rest = new TestCategory("REST-plugin");
-    $rest->addTests([
-        new Test("version", "testRESTVersion", false),
-        new Test("compatible ILIAS-version", "testRESTkMinMaxVersion"),
-        new Test("entry in ILIAS-database", "testRESTInIlDB"),
-        new Test("plugin-updates in ILIAS", "testRESTLastUpdateVersion", false),
-        new Test("ILIAS-database version", "testRESTDbVersion"),
-        new Test("active", "testRESTPluginActive")
-    ]);
-    $suite->addCategories($rest);
-
     $pegasusHelper = new TestCategory("PegasusHelper-plugin");
     $pegasusHelper->addTests([
-        new Test("working REST-installation", "testPegasusHelperRESTInstallation"),
         new Test("version", "testPegasusHelperVersion", false),
         new Test("compatible ILIAS-version", "testPegasusHelperMinMaxVersion"),
         new Test("entry in ILIAS-database", "testPegasusHelperInIlDB"),
@@ -61,6 +48,14 @@ function getInternalTestSuite($context)
         new Test("active", "testPegasusHelperPluginActive")
     ]);
     $suite->addCategories($pegasusHelper);
+
+    $api = new TestCategory("PegasusHelper API");
+    $api->addTests([
+        new Test("api.php rejects a request without a token", "testApiRejectsMissingToken"),
+        new Test("Authorization header reaches PHP", "testApiReceivesAuthorizationHeader"),
+        new Test("legacy REST plugin no longer active", "testRestPluginNotActive", false)
+    ]);
+    $suite->addCategories($api);
 
     return $suite;
 }
@@ -78,14 +73,13 @@ function getExternalTestsSuite($context)
     $pegasusHelper = new TestCategory("Accessing Resources");
     $pegasusHelper->addTests([
         new Test("external URL", "testExternalUrl", false),
-        new Test("REST login", "testRESTLoginConnection", false)
+        new Test("PegasusHelper API reachable", "testApiConnection", false)
     ]);
     $suite->addCategories($pegasusHelper);
 
     $pegasusHelper = new TestCategory("External Script");
     $pegasusHelper->addTests([
-        new Test("successful run", "testRESTExternalTestScriptComplete", false),
-        new Test("body transmitted", "testRESTExternalTestScriptTransmitted", false)
+        new Test("successful run", "testExternalTestScriptComplete", false)
     ]);
     $suite->addCategories($pegasusHelper);
 
@@ -98,16 +92,6 @@ function testWorkingDirectory($info, $targetInfo, $suite)
 {
     $pass = $info["TestScript"]["correct_working_directory"];
     $msg = $pass ? "" : "the script must be run from [YOUR_ILIAS]/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/testing";
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTDirectory($info, $targetInfo, $suite)
-{
-    if (!$info["TestScript"]["correct_working_directory"]) {
-        return failTestFromMissingInfo("wrong working directory");
-    }
-    $pass = file_exists(getRootPlugins() . "/REST");
-    $msg = $pass ? "" : "REST must be located at [YOUR_ILIAS]/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/REST";
     return completeTestResult($pass, $msg);
 }
 
@@ -158,86 +142,6 @@ function testILIASRedirectStatement($info, $targetInfo, $suite)
     return completeTestResult($pass, $msg);
 }
 
-// 2 REST
-
-function testRESTVersion($info, $targetInfo, $suite)
-{
-    if (!$info["REST"]["available"]) {
-        return failTestFromMissingInfo();
-    }
-    if (!$targetInfo["REST"]["available"]) {
-        return failTestFromMissingInfo();
-    }
-    list($pass, $msg) = testVersionIs($info["REST"]["version"], $targetInfo["REST"]["version"], "the latest version is [TARGET] and the one used here is [VERSION]");
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTkMinMaxVersion($info, $targetInfo, $suite)
-{
-    if (!$info["ILIAS"]["available"]) {
-        return failTestFromMissingInfo();
-    }
-    if (!$info["REST"]["available"]) {
-        return failTestFromMissingInfo();
-    }
-    list($pass, $msg) = testMinMaxVersion($info["ILIAS"]["version"], $info["REST"]["ilias_min_version"], $info["REST"]["ilias_max_version"]);
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTInIlDB($info, $targetInfo, $suite)
-{
-    if (!$info["TestScript"]["ilDB_connection"]) {
-        return failTestFromMissingInfo("connection to ILIAS-database required");
-    }
-    list($pass, $msg) = testInIlDB($info["REST"]);
-    if (!$pass) {
-        failTestFromMissingInfo($msg);
-    } // TODO this may fail with installed plugins (mysql user?)
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTLastUpdateVersion($info, $targetInfo, $suite)
-{
-    if (!$info["TestScript"]["ilDB_connection"]) {
-        return failTestFromMissingInfo("connection to ILIAS-database required");
-    }
-    if (!$info["REST"]["ilDB"]["available"]) {
-        return failTestFromMissingInfo("plugin is not (correctly) installed");
-    }
-    if (!$info["REST"]["available"]) {
-        return failTestFromMissingInfo();
-    }
-    list($pass, $msg) = testVersionIs($info["REST"]["ilDB"]["last_update_version"], $info["REST"]["version"], "some plugin-updates in ILIAS are not installed");
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTDbVersion($info, $targetInfo, $suite)
-{
-    if (!$info["TestScript"]["ilDB_connection"]) {
-        return failTestFromMissingInfo("connection to ILIAS-database required");
-    }
-    if (!$info["REST"]["ilDB"]["available"]) {
-        return failTestFromMissingInfo("plugin is not (correctly) installed");
-    }
-    if (!$targetInfo["PegasusHelper"]["ilDB"]["available"]) {
-        return failTestFromMissingInfo();
-    }
-    list($pass, $msg) = testVersionIs($info["REST"]["ilDB"]["db_version"], $targetInfo["REST"]["ilDB"]["db_version"]);
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTPluginActive($info, $targetInfo, $suite)
-{
-    if (!$info["TestScript"]["ilDB_connection"]) {
-        return failTestFromMissingInfo("connection to ILIAS-database required");
-    }
-    if (!$info["REST"]["ilDB"]["available"]) {
-        return failTestFromMissingInfo("plugin is not (correctly) installed");
-    }
-    list($pass, $msg) = testPluginActive($info["REST"]["ilDB"]);
-    return completeTestResult($pass, $msg);
-}
-
 // 3 PegasusHelper
 
 function testPegasusHelperVersion($info, $targetInfo, $suite)
@@ -262,36 +166,6 @@ function testPegasusHelperMinMaxVersion($info, $targetInfo, $suite)
     }
     list($pass, $msg) = testMinMaxVersion($info["ILIAS"]["version"], $info["PegasusHelper"]["ilias_min_version"], $info["PegasusHelper"]["ilias_max_version"]);
     return completeTestResult($pass, $msg);
-}
-
-function testPegasusHelperRESTInstallation($info, $targetInfo, $suite)
-{
-    $pass = true;
-    $pass_non_mandatory = true;
-    $missing_info = false;
-    foreach ($suite->getCategoryByTitle("REST-plugin")->tests as $test) {
-        if ($test->result->state === ResultState::R_FAIL) {
-            if ($test->mandatory) {
-                $pass = false;
-            } else {
-                $pass_non_mandatory = false;
-            }
-        }
-        if ($test->result->state === ResultState::R_MISSING_INFO || $test->result->state === ResultState::R_ERROR) {
-            $missing_info = true;
-        }
-    }
-
-    if (!$pass) {
-        return completeTestResult(false, "some tests failed for the REST-plugin");
-    }
-    if (!$pass_non_mandatory) {
-        return failTestFromMissingInfo("a test for the REST-plugin that is not mandatory has failed");
-    }
-    if ($missing_info) {
-        return failTestFromMissingInfo("a test for the REST-plugin has not been completed");
-    }
-    return completeTestResult(true, "");
 }
 
 function testPegasusHelperInIlDB($info, $targetInfo, $suite)
@@ -348,6 +222,50 @@ function testPegasusHelperPluginActive($info, $targetInfo, $suite)
     return completeTestResult($pass, $msg);
 }
 
+// 3b PegasusHelper API
+
+function testApiRejectsMissingToken($info, $targetInfo, $suite)
+{
+    if (!isset($info["Connectivity"]["api_no_token"]["response"]["status"])) {
+        return failTestFromMissingInfo();
+    }
+    $status = $info["Connectivity"]["api_no_token"]["response"]["status"];
+    $pass = $status === 401;
+    $msg = $pass ? "" : "expected HTTP 401 for a request without an Authorization header, got $status";
+    return completeTestResult($pass, $msg);
+}
+
+function testApiReceivesAuthorizationHeader($info, $targetInfo, $suite)
+{
+    if (!isset($info["Connectivity"]["api_bad_token"]["response"]["status"])) {
+        return failTestFromMissingInfo();
+    }
+    $status = $info["Connectivity"]["api_bad_token"]["response"]["status"];
+    $body = $info["Connectivity"]["api_bad_token"]["response"]["body"];
+    $message = is_array($body) ? ($body["message"] ?? "") : "";
+
+    // A bogus (but present) Authorization header must fail for a *different*
+    // reason than a missing one ("invalid" vs "missing"), which proves the
+    // header actually reached PHP -- some server/proxy configurations strip it.
+    $pass = $status === 401 && stripos($message, "invalid") !== false;
+    $msg = $pass ? "" : "expected an 'invalid token' error for a bogus Authorization header, got status $status / '$message'";
+    return completeTestResult($pass, $msg);
+}
+
+function testRestPluginNotActive($info, $targetInfo, $suite)
+{
+    if (!$info["TestScript"]["ilDB_connection"]) {
+        return failTestFromMissingInfo("connection to ILIAS-database required");
+    }
+    if (!$info["RestPluginLegacy"]["ilDB"]["available"]) {
+        // No database entry at all: the REST plugin has already been fully removed.
+        return completeTestResult(true, "");
+    }
+    $pass = !((bool) $info["RestPluginLegacy"]["ilDB"]["active"]);
+    $msg = $pass ? "" : "the ILIAS REST plugin is still active; PegasusHelper no longer needs it and it should be uninstalled";
+    return completeTestResult($pass, $msg);
+}
+
 // 4 External
 
 function testExternalUrl($info, $targetInfo, $suite)
@@ -359,31 +277,29 @@ function testExternalUrl($info, $targetInfo, $suite)
     return completeTestResult($pass, $msg);
 }
 
-function testRESTLoginConnection($info, $targetInfo, $suite)
+function testApiConnection($info, $targetInfo, $suite)
 {
-    if (!$info["Connectivity"]["rest_login"]["response"]["status"]) {
+    if (!isset($info["Connectivity"]["api_no_token"]["response"]["status"])) {
         return failTestFromMissingInfo();
     }
-    list($pass, $msg) = testHttpResponseStatus($info["Connectivity"]["rest_login"]["response"]["status"]);
+    // An unauthenticated request is expected to be rejected with 401, which
+    // proves the request reached api.php and was routed correctly.
+    $status = $info["Connectivity"]["api_no_token"]["response"]["status"];
+    $pass = $status === 401;
+    $msg = $pass ? "" : "expected HTTP 401 (missing token), received status $status";
     return completeTestResult($pass, $msg);
 }
 
-function testRESTExternalTestScriptComplete($info, $targetInfo, $suite)
+function testExternalTestScriptComplete($info, $targetInfo, $suite)
 {
     if (!$info["Connectivity"]["external_testing"]) {
         return failTestFromMissingInfo();
     }
-    list($pass, $msg) = testHttpResponseStatus($info["Connectivity"]["external_testing"]["response"]["status"]);
-    return completeTestResult($pass, $msg);
-}
-
-function testRESTExternalTestScriptTransmitted($info, $targetInfo, $suite)
-{
-    if (!$info["Connectivity"]["external_testing"]["response"]["body"]["response"]) {
-        return failTestFromMissingInfo();
-    }
-    $pass = isset($info["Connectivity"]["external_testing"]["response"]["body"]["response"]["body"]["request"]["body"]["dat"]);
-    $msg = ""; // TODO better failing message
+    // run.php's own (curl-based) httpLoggedRequest() puts the real target status
+    // under body.info.http_code (curl_getinfo), not body.response.
+    $status = $info["Connectivity"]["external_testing"]["response"]["body"]["info"]["http_code"] ?? null;
+    $pass = $status === 401;
+    $msg = $pass ? "" : "expected the external script to receive HTTP 401 from api.php, got " . var_export($status, true);
     return completeTestResult($pass, $msg);
 }
 
