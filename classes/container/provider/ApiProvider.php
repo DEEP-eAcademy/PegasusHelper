@@ -86,32 +86,74 @@ final class ApiProvider implements ServiceProviderInterface
         });
     }
 
+    /**
+     * Builds the route table. Every controller is constructed lazily, inside
+     * the handler closure actually registered with the router, rather than
+     * eagerly here -- some controllers' dependencies (e.g. ObjectDataMapper
+     * needs $DIC->access()) only become available once ApiKernel has resolved
+     * the route AND (for a Bearer route) called ApiInitialisation::loadUser().
+     * Building them eagerly here, before either of those has happened, throws
+     * Pimple\Exception\UnknownIdentifierException for "ilAccess", because
+     * ilAccess is only registered in the DIC by initAccessHandling(), which
+     * loadUser() triggers.
+     */
     private function buildRouter(Container $c): Router
     {
-        global $DIC;
         $router = new Router();
 
-        $router->post('/v2/oauth2/token', new TokenController($c[TokenService::class]), Router::AUTH_NONE);
+        $router->post('/v2/oauth2/token', function ($request, $params) use ($c) {
+            return (new TokenController($c[TokenService::class]))($request, $params);
+        }, Router::AUTH_NONE);
 
-        $router->get('/v2/ilias-app/auth-token', new AuthTokenController($c[AuthTokenRepository::class]));
+        $router->get('/v2/ilias-app/auth-token', function ($request, $params) use ($c) {
+            return (new AuthTokenController($c[AuthTokenRepository::class]))($request, $params);
+        });
 
-        $objectController = new ObjectController($c[ObjectDataMapper::class]);
-        $router->get('/v2/ilias-app/desktop', [$objectController, 'desktop']);
-        $router->get('/v2/ilias-app/objects/{refId}', [$objectController, 'children']);
-        $router->get('/v3/ilias-app/object/{refId}', [$objectController, 'object']);
+        $objectController = function () use ($c) {
+            return new ObjectController($c[ObjectDataMapper::class]);
+        };
+        $router->get('/v2/ilias-app/desktop', function ($request, $params) use ($objectController) {
+            return $objectController()->desktop($request, $params);
+        });
+        $router->get('/v2/ilias-app/objects/{refId}', function ($request, $params) use ($objectController) {
+            return $objectController()->children($request, $params);
+        });
+        $router->get('/v3/ilias-app/object/{refId}', function ($request, $params) use ($objectController) {
+            return $objectController()->object($request, $params);
+        });
 
-        $fileController = new FileController();
-        $router->get('/v3/ilias-app/files/{refId}', [$fileController, 'metadata']);
-        $router->post('/v3/ilias-app/files/{refId}/learning-progress-to-done', [$fileController, 'markLearningProgressDone']);
-        $router->get('/v1/files/{refId}', [$fileController, 'download']);
+        $fileController = static function (): FileController {
+            return new FileController();
+        };
+        $router->get('/v3/ilias-app/files/{refId}', function ($request, $params) use ($fileController) {
+            return $fileController()->metadata($request, $params);
+        });
+        $router->post('/v3/ilias-app/files/{refId}/learning-progress-to-done', function ($request, $params) use ($fileController) {
+            return $fileController()->markLearningProgressDone($request, $params);
+        });
+        $router->get('/v1/files/{refId}', function ($request, $params) use ($fileController) {
+            return $fileController()->download($request, $params);
+        });
 
-        $router->get('/v3/ilias-app/theme', new ThemeController($DIC->database()));
+        $router->get('/v3/ilias-app/theme', function ($request, $params) {
+            global $DIC;
 
-        $router->get('/v2/ilias-app/news', new NewsController());
+            return (new ThemeController($DIC->database()))($request, $params);
+        });
 
-        $learningModuleController = new LearningModuleController($c[LearningModuleZipBuilder::class], $c[AuthTokenRepository::class]);
-        $router->get('/v1/learning-module/{refId}', [$learningModuleController, 'metadata']);
-        $router->get('/v1/learning-module/{refId}/zip', [$learningModuleController, 'zip'], Router::AUTH_NONE);
+        $router->get('/v2/ilias-app/news', function ($request, $params) {
+            return (new NewsController())($request, $params);
+        });
+
+        $learningModuleController = function () use ($c) {
+            return new LearningModuleController($c[LearningModuleZipBuilder::class], $c[AuthTokenRepository::class]);
+        };
+        $router->get('/v1/learning-module/{refId}', function ($request, $params) use ($learningModuleController) {
+            return $learningModuleController()->metadata($request, $params);
+        });
+        $router->get('/v1/learning-module/{refId}/zip', function ($request, $params) use ($learningModuleController) {
+            return $learningModuleController()->zip($request, $params);
+        }, Router::AUTH_NONE);
 
         return $router;
     }
