@@ -131,73 +131,80 @@ ilPegasusHelperConfigGUI::copyDefaultIcons();
 ?>
 <#12>
 <?php
-// Settings for the plugin's own OAuth2 implementation, replacing the ILIAS
-// REST plugin's "ui_uihk_rest_config" table (see step #15 for the migration).
-global $ilDB;
-$fields = array(
-    'setting_name' => array(
-        'type' => 'text',
-        'length' => 128,
-        'notnull' => true
-    ),
-    'setting_value' => array(
-        'type' => 'text',
-        'length' => 512,
-        'notnull' => false
-    )
-);
-$ilDB->createTable('ui_uihk_pegasus_config', $fields);
-$ilDB->addPrimaryKey('ui_uihk_pegasus_config', array('setting_name'));
-
-global $ilLog;
-$ilLog->write('Plugin PegasusHelper -> DB-Update #12: Created ui_uihk_pegasus_config.');
+// No-op. This step originally created a table named "ui_uihk_pegasus_config"
+// (22 bytes), which was right at ILIAS's maximum table-identifier length and
+// made the very next step (which needed "ui_uihk_pegasus_refresh", 23 bytes)
+// fail with "Invalid table name ... Maximum table identifer length is 22
+// bytes". Both tables are created (under shorter names) in step #13 instead,
+// which also cleans up the now-orphaned table for any install that got this
+// far before the fix. See step #13.
 ?>
 <#13>
 <?php
-// Tracks issued refresh tokens, replacing the REST plugin's "ui_uihk_rest_refresh"
-// (see step #16 for the migration). Access tokens are stateless and are not
-// tracked in a table.
+// Settings for the plugin's own OAuth2 implementation (replacing the ILIAS
+// REST plugin's "ui_uihk_rest_config" table; see step #15 for the migration),
+// and tracking for issued refresh tokens (replacing "ui_uihk_rest_refresh";
+// see step #16). Access tokens are stateless and are not tracked in a table.
+//
+// Table names are kept well under ILIAS's 22-byte identifier limit (see #12).
 global $ilDB;
-$fields = array(
-    'id' => array(
-        'type' => 'integer',
-        'length' => 4,
-        'notnull' => true
-    ),
-    'token_hash' => array(
-        'type' => 'text',
-        'length' => 64,
-        'fixed' => true,
-        'notnull' => true
-    ),
-    'user_id' => array(
-        'type' => 'integer',
-        'length' => 4,
-        'notnull' => true
-    ),
-    'created' => array(
-        'type' => 'timestamp',
-        'notnull' => true
-    ),
-    'last_refresh' => array(
-        'type' => 'timestamp',
-        'notnull' => true
-    ),
-    'refreshes' => array(
-        'type' => 'integer',
-        'length' => 4,
-        'notnull' => true,
-        'default' => 0
-    )
-);
-$ilDB->createTable('ui_uihk_pegasus_refresh', $fields);
-$ilDB->addPrimaryKey('ui_uihk_pegasus_refresh', array('id'));
-$ilDB->createSequence('ui_uihk_pegasus_refresh');
-$ilDB->addUniqueConstraint('ui_uihk_pegasus_refresh', array('token_hash'), 'uc1');
-$ilDB->addIndex('ui_uihk_pegasus_refresh', array('created'), 'i1');
+
+// Clean up the orphaned table from the previous (too-long-named) attempt at
+// this step, on any install that reached step #12 before this fix.
+$ilDB->dropTable('ui_uihk_pegasus_config', false);
+
+if (!$ilDB->tableExists('ui_uihk_peg_config')) {
+    $fields = array(
+        'setting_name' => array(
+            'type' => 'text',
+            'length' => 128,
+            'notnull' => true
+        ),
+        'setting_value' => array(
+            'type' => 'text',
+            'length' => 512,
+            'notnull' => false
+        )
+    );
+    $ilDB->createTable('ui_uihk_peg_config', $fields);
+    $ilDB->addPrimaryKey('ui_uihk_peg_config', array('setting_name'));
+}
+
+if (!$ilDB->tableExists('ui_uihk_peg_refresh')) {
+    $fields = array(
+        'token_hash' => array(
+            'type' => 'text',
+            'length' => 64,
+            'fixed' => true,
+            'notnull' => true
+        ),
+        'user_id' => array(
+            'type' => 'integer',
+            'length' => 4,
+            'notnull' => true
+        ),
+        'created' => array(
+            'type' => 'timestamp',
+            'notnull' => true
+        ),
+        'last_refresh' => array(
+            'type' => 'timestamp',
+            'notnull' => true
+        ),
+        'refreshes' => array(
+            'type' => 'integer',
+            'length' => 4,
+            'notnull' => true,
+            'default' => 0
+        )
+    );
+    $ilDB->createTable('ui_uihk_peg_refresh', $fields);
+    $ilDB->addPrimaryKey('ui_uihk_peg_refresh', array('token_hash'));
+    $ilDB->addIndex('ui_uihk_peg_refresh', array('created'), 'i1');
+}
 
 global $ilLog;
-$ilLog->write('Plugin PegasusHelper -> DB-Update #13: Created ui_uihk_pegasus_refresh.');
+$ilLog->write('Plugin PegasusHelper -> DB-Update #13: Created ui_uihk_peg_config and ui_uihk_peg_refresh.');
 ?>
 <#14>
 <?php
@@ -221,12 +228,12 @@ $fields = array(
         'notnull' => true
     )
 );
-$ilDB->createTable('ui_uihk_pegasus_token', $fields);
-$ilDB->addPrimaryKey('ui_uihk_pegasus_token', array('token'));
-$ilDB->addIndex('ui_uihk_pegasus_token', array('user_id'), 'i1');
+$ilDB->createTable('ui_uihk_peg_token', $fields);
+$ilDB->addPrimaryKey('ui_uihk_peg_token', array('token'));
+$ilDB->addIndex('ui_uihk_peg_token', array('user_id'), 'i1');
 
 global $ilLog;
-$ilLog->write('Plugin PegasusHelper -> DB-Update #14: Created ui_uihk_pegasus_token.');
+$ilLog->write('Plugin PegasusHelper -> DB-Update #14: Created ui_uihk_peg_token.');
 ?>
 <#15>
 <?php
@@ -263,9 +270,9 @@ $fields = array(
         'notnull' => true
     )
 );
-$ilDB->createTable('ui_uihk_pegasus_revocation', $fields);
-$ilDB->addPrimaryKey('ui_uihk_pegasus_revocation', array('user_id'));
+$ilDB->createTable('ui_uihk_peg_revoke', $fields);
+$ilDB->addPrimaryKey('ui_uihk_peg_revoke', array('user_id'));
 
 global $ilLog;
-$ilLog->write('Plugin PegasusHelper -> DB-Update #17: Created ui_uihk_pegasus_revocation.');
+$ilLog->write('Plugin PegasusHelper -> DB-Update #17: Created ui_uihk_peg_revoke.');
 ?>

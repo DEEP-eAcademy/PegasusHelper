@@ -30,7 +30,7 @@ use ilDBInterface;
  */
 final class RevocationRepository
 {
-    private const TABLE = 'ui_uihk_pegasus_revocation';
+    private const TABLE = 'ui_uihk_peg_revoke';
     private const GLOBAL_ID = 0;
 
     /**

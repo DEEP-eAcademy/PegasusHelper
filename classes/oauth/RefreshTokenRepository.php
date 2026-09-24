@@ -7,18 +7,22 @@ use ilDBInterface;
 /**
  * Class RefreshTokenRepository
  *
- * Tracks issued refresh tokens in `ui_uihk_pegasus_refresh`, replacing the REST
+ * Tracks issued refresh tokens in `ui_uihk_peg_refresh`, replacing the REST
  * plugin's `ui_uihk_rest_refresh` table. Access tokens are stateless and are not
  * tracked here; only refresh tokens need a server-side row, because a refresh
  * token must remain valid until it expires even after being used (see
  * {@see TokenService::refresh()}), and because the Statistics tab counts refreshes
  * by their `created` date.
  *
+ * `token_hash` is the primary key directly (no surrogate id/sequence): it is
+ * already a unique 64-char sha256 hex digest, so a separate auto-increment
+ * column would only exist to satisfy a "tables need a numeric id" habit.
+ *
  * @author  Nicolas Schäfli <ns@studer-raimann.ch>
  */
 final class RefreshTokenRepository
 {
-    private const TABLE = 'ui_uihk_pegasus_refresh';
+    private const TABLE = 'ui_uihk_peg_refresh';
 
     /**
      * @var ilDBInterface
@@ -42,8 +46,8 @@ final class RefreshTokenRepository
         $now = date('Y-m-d H:i:s');
 
         $this->db->manipulateF(
-            'INSERT INTO ' . self::TABLE . ' (id, token_hash, user_id, created, last_refresh, refreshes) '
-            . 'VALUES (' . $this->db->nextId(self::TABLE) . ', %s, %s, %s, %s, %s)',
+            'INSERT INTO ' . self::TABLE . ' (token_hash, user_id, created, last_refresh, refreshes) '
+            . 'VALUES (%s, %s, %s, %s, %s)',
             ['text', 'integer', 'timestamp', 'timestamp', 'integer'],
             [$hash, $userId, $now, $now, 0]
         );
@@ -94,8 +98,8 @@ final class RefreshTokenRepository
     public function insertMigrated(string $tokenString, int $userId, string $created, string $lastRefresh, int $refreshes): void
     {
         $this->db->manipulateF(
-            'INSERT INTO ' . self::TABLE . ' (id, token_hash, user_id, created, last_refresh, refreshes) '
-            . 'VALUES (' . $this->db->nextId(self::TABLE) . ', %s, %s, %s, %s, %s)',
+            'INSERT INTO ' . self::TABLE . ' (token_hash, user_id, created, last_refresh, refreshes) '
+            . 'VALUES (%s, %s, %s, %s, %s)',
             ['text', 'integer', 'timestamp', 'timestamp', 'integer'],
             [$this->hash($tokenString), $userId, $created, $lastRefresh, $refreshes]
         );

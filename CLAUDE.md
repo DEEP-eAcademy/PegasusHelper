@@ -47,7 +47,7 @@ The plugin follows ILIAS 10 plugin conventions as a `UserInterfaceHook` plugin:
 - **Plugin entry point:** `class.ilPegasusHelperPlugin.php` — singleton that extends `ilUserInterfaceHookPlugin`
 - **Configuration GUI:** `class.ilPegasusHelperConfigGUI.php` — admin configuration interface
 - **UI Hook GUI:** `class.ilPegasusHelperUIHookGUI.php` — handles UI hook integration points
-- **Lifecycle hooks:** `beforeUninstall()` in the main plugin class drops the plugin's own tables (`ui_uihk_pegasus_theme`/`config`/`refresh`/`token`). There is no `beforeUpdate()` prerequisite check since 7.0.0 (it used to require the ILIAS REST plugin).
+- **Lifecycle hooks:** `beforeUninstall()` in the main plugin class drops the plugin's own tables (`ui_uihk_pegasus_theme`, `ui_uihk_peg_config`/`refresh`/`token`/`revoke`). There is no `beforeUpdate()` prerequisite check since 7.0.0 (it used to require the ILIAS REST plugin). Note the `ui_uihk_peg_*` (not `pegasus`) prefix on the newer tables -- see the dbupdate #12/#13 comments for why.
 
 ### Chain of Responsibility Pattern
 
@@ -94,13 +94,13 @@ The container validates ILIAS version >= 9.0 at bootstrap time and throws `Depen
 
 - **`TokenCodec`** — encodes/decodes the OAuth2 access/refresh token wire format **byte-compatibly** with the (now removed) ILIAS REST plugin's `core/oauth2_v2` tokens, so tokens issued before the 7.0.0 migration keep working. Don't change the wire format (field order, hash construction) without a very good reason — see its docblock.
 - **`TokenService`** — issues/validates the token pair; used by both `OauthManagerImpl` (initial login) and `api\controller\TokenController` (refresh).
-- **`ApiSettings`** — repository over `ui_uihk_pegasus_config` (API key/secret, signing salt, token TTLs).
-- **`RefreshTokenRepository`** — repository over `ui_uihk_pegasus_refresh`; backs both refresh-token validation and the Statistics tab.
-- **`RevocationRepository`** — repository over `ui_uihk_pegasus_revocation`. Access tokens are otherwise stateless and can't be individually killed before they expire; this is the one exception, giving the 'General' tab's "Revoke" actions a way to invalidate every already-issued token for a user (or globally, under the reserved user id `0`) by checking a stored cutoff against the token's issued-at time. That issued-at time rides in the token's existing (previously always-empty) `misc` field, so the wire format itself never changed — see `TokenCodec::issuedAt()`. A token minted before this feature existed (`misc=''`) is treated as issued at time zero, i.e. revoked by any cutoff at all.
+- **`ApiSettings`** — repository over `ui_uihk_peg_config` (API key/secret, signing salt, token TTLs).
+- **`RefreshTokenRepository`** — repository over `ui_uihk_peg_refresh`; backs both refresh-token validation and the Statistics tab.
+- **`RevocationRepository`** — repository over `ui_uihk_peg_revoke`. Access tokens are otherwise stateless and can't be individually killed before they expire; this is the one exception, giving the 'General' tab's "Revoke" actions a way to invalidate every already-issued token for a user (or globally, under the reserved user id `0`) by checking a stored cutoff against the token's issued-at time. That issued-at time rides in the token's existing (previously always-empty) `misc` field, so the wire format itself never changed — see `TokenCodec::issuedAt()`. A token minted before this feature existed (`misc=''`) is treated as issued at time zero, i.e. revoked by any cutoff at all.
 
 ### Authentication (`classes/authentication/`)
 
-- **`AuthTokenRepository`** — the short-lived (60s), one-time SSO auth-tokens used to open ILIAS pages/resources from the app (`ui_uihk_pegasus_token`), replacing the REST plugin's `ui_uihk_rest_token` table.
+- **`AuthTokenRepository`** — the short-lived (60s), one-time SSO auth-tokens used to open ILIAS pages/resources from the app (`ui_uihk_peg_token`), replacing the REST plugin's `ui_uihk_rest_token` table.
 - **`UserTokenAuthenticator`** interface — token validation strategy.
 - **`DefaultUserTokenAuthenticator`** — logs the user into a real ILIAS web session; used by the `goto.php`/resource-link handlers, which run inside a normal ILIAS request that already has a session. **Never** use this from inside `api.php` — that request has no session and must stay stateless; the learning-module zip route instead calls `AuthTokenRepository::consume()` directly, followed by `ApiInitialisation::loadUser()`.
 
@@ -134,6 +134,6 @@ Use this when installation fails to diagnose configuration issues.
 
 3. **Service resolution:** Use `PegasusHelperContainer::resolve(ClassName::class)` to retrieve registered services, not direct instantiation.
 
-4. **Configuration scope:** Plugin configuration (API key/secret, token salt/TTLs) persists in `ui_uihk_pegasus_config`, managed by `oauth\ApiSettings`; defaults are set (or migrated from the REST plugin) by `migration\RestPluginMigration` during the database update.
+4. **Configuration scope:** Plugin configuration (API key/secret, token salt/TTLs) persists in `ui_uihk_peg_config`, managed by `oauth\ApiSettings`; defaults are set (or migrated from the REST plugin) by `migration\RestPluginMigration` during the database update.
 
 5. **Autoloading:** PSR-4 autoloading is configured for the `SRAG\PegasusHelper\` namespace pointing to `classes/`. Class map entries exist for legacy ILIAS plugin classes (ilPegasusHelperConfigGUI, etc.).

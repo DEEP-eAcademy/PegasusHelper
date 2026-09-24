@@ -22,7 +22,7 @@ use ilDBInterface;
  */
 final class AuthTokenRepository
 {
-    private const TABLE = 'ui_uihk_pegasus_token';
+    private const TABLE = 'ui_uihk_peg_token';
     private const TTL_SECONDS = 60;
 
     /**

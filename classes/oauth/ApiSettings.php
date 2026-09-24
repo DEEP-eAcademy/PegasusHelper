@@ -16,7 +16,7 @@ use ilDBInterface;
  */
 final class ApiSettings
 {
-    private const TABLE = 'ui_uihk_pegasus_config';
+    private const TABLE = 'ui_uihk_peg_config';
 
     public const KEY_API_KEY = 'api_key';
     public const KEY_API_SECRET = 'api_secret';
