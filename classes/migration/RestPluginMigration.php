@@ -15,16 +15,22 @@ use SRAG\PegasusHelper\oauth\TokenCodec;
  * asks admins to update PegasusHelper before uninstalling REST, precisely so
  * this can run), it copies the `ilias_pegasus` client's secret, the token
  * signing salt and the token TTLs, so tokens already on users' devices keep
- * working; otherwise it generates fresh settings, matching what
- * `classes/rest/RestSetup.php` used to do for a brand new installation.
+ * working; otherwise it generates fresh settings, with much shorter default
+ * TTLs than the REST plugin's `classes/rest/RestSetup.php` used to (see the
+ * DEFAULT_* constants below).
  *
  * @author  Nicolas Schäfli <ns@studer-raimann.ch>
  */
 final class RestPluginMigration
 {
     private const REST_API_KEY = 'ilias_pegasus';
-    private const DEFAULT_ACCESS_TOKEN_TTL = '3600000';
-    private const DEFAULT_REFRESH_TOKEN_TTL = '4500000';
+    // Deliberately much shorter than the REST plugin's own defaults (which were
+    // ~6.8 and ~8.6 years -- see RestSetup's historical dbupdate steps #2/#3).
+    // These only apply to a brand-new install with no REST plugin data to copy;
+    // an admin can change them any time via the plugin's General configuration
+    // tab, and a leaked access token now expires in an hour rather than years.
+    private const DEFAULT_ACCESS_TOKEN_TTL = '60';        // 1 hour
+    private const DEFAULT_REFRESH_TOKEN_TTL = '129600';   // 90 days
 
     /**
      * @var ilDBInterface

@@ -11,10 +11,13 @@ use SRAG\PegasusHelper\api\ApiException;
  * app, replacing the ILIAS REST plugin's `core/oauth2_v2` for the single
  * `ilias_pegasus` API client this plugin serves.
  *
- * Access tokens are stateless: any token whose signature and expiry check out is
- * accepted, exactly as the REST plugin behaved (its `ui_uihk_rest_access` table
- * was written to but never actually consulted to reject a token early). Refresh
- * tokens are tracked in {@see RefreshTokenRepository}, because a refresh token
+ * Access tokens are otherwise stateless: any token whose signature and expiry
+ * check out is accepted, exactly as the REST plugin behaved (its
+ * `ui_uihk_rest_access` table was written to but never actually consulted to
+ * reject a token early). The one exception is {@see RevocationRepository}: an
+ * admin can invalidate every already-issued token for a user (or globally)
+ * without waiting for expiry or touching the signing salt. Refresh tokens are
+ * additionally tracked in {@see RefreshTokenRepository}, because a refresh token
  * must keep working after being used until it expires on its own -- the app can
  * fire multiple concurrent refreshes with the same refresh token.
  *
@@ -37,11 +40,21 @@ final class TokenService
      */
     private $refreshTokens;
 
-    public function __construct(TokenCodec $codec, ApiSettings $settings, RefreshTokenRepository $refreshTokens)
-    {
+    /**
+     * @var RevocationRepository
+     */
+    private $revocations;
+
+    public function __construct(
+        TokenCodec $codec,
+        ApiSettings $settings,
+        RefreshTokenRepository $refreshTokens,
+        RevocationRepository $revocations
+    ) {
         $this->codec = $codec;
         $this->settings = $settings;
         $this->refreshTokens = $refreshTokens;
+        $this->revocations = $revocations;
     }
 
     /**
@@ -62,7 +75,13 @@ final class TokenService
         $accessToken = $this->codec->serialize($accessArray);
         $refreshToken = $this->codec->serialize($refreshArray);
 
-        $this->refreshTokens->insert($refreshToken, $userId);
+        // Store the *normalized* form, matching what refresh() looks up: serialize()
+        // urlencodes its base64 output, which routinely contains '+', '/' or '='
+        // and thus gets percent-escaped; normalize()'s rawurldecode() then differs
+        // from the raw serialized string whenever that happened. Hashing the raw
+        // form here would make the very first refresh attempt fail unpredictably
+        // (whenever escaping occurred), rejecting the token as "revoked".
+        $this->refreshTokens->insert($this->codec->normalize($refreshToken), $userId);
 
         return [
             'access_token' => $accessToken,
@@ -134,6 +153,25 @@ final class TokenService
     }
 
     /**
+     * Invalidates every token already issued to this user. Does not affect a
+     * fresh login started after this call.
+     *
+     * @param int $userId
+     */
+    public function revokeUser(int $userId): void
+    {
+        $this->revocations->revokeUser($userId);
+    }
+
+    /**
+     * Invalidates every token already issued to every user. For incident response.
+     */
+    public function revokeAll(): void
+    {
+        $this->revocations->revokeAll();
+    }
+
+    /**
      * @param string $rawToken
      * @param string $expectedClass one of TokenCodec::CLASS_*
      * @return array the decoded, verified token array
@@ -160,6 +198,9 @@ final class TokenService
         $iliasClient = defined('CLIENT_ID') ? CLIENT_ID : '';
         if (!hash_equals($iliasClient, (string) $token['ilias_client'])) {
             throw ApiException::unauthorized('Invalid token');
+        }
+        if ($this->revocations->isRevoked((int) $token['user_id'], TokenCodec::issuedAt($token))) {
+            throw ApiException::unauthorized('Token has been revoked');
         }
 
         return $token;

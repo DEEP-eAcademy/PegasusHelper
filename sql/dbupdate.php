@@ -244,3 +244,28 @@ global $ilDB;
 global $ilDB;
 (new SRAG\PegasusHelper\migration\RestPluginMigration($ilDB))->migrateRefreshTokens();
 ?>
+<#17>
+<?php
+// Per-user (and global, under the reserved user_id 0) token revocation cutoffs.
+// Access tokens are otherwise stateless and cannot be individually killed, so
+// this is what backs the "Revoke" actions on the General configuration tab --
+// see SRAG\PegasusHelper\oauth\RevocationRepository.
+global $ilDB;
+$fields = array(
+    'user_id' => array(
+        'type' => 'integer',
+        'length' => 4,
+        'notnull' => true
+    ),
+    'revoked_before' => array(
+        'type' => 'integer',
+        'length' => 4,
+        'notnull' => true
+    )
+);
+$ilDB->createTable('ui_uihk_pegasus_revocation', $fields);
+$ilDB->addPrimaryKey('ui_uihk_pegasus_revocation', array('user_id'));
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #17: Created ui_uihk_pegasus_revocation.');
+?>

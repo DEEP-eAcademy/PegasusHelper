@@ -1,6 +1,6 @@
 <?php
 $id = 'sragpegasushelper';
-$version = '7.0.0';
+$version = '7.1.0';
 $ilias_min_version = '10.0.0';
 $ilias_max_version = '10.999';
 $responsible = 'Jakub';

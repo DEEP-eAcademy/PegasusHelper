@@ -3,6 +3,7 @@
 namespace SRAG\PegasusHelper\api\controller;
 
 use ilParticipants;
+use SRAG\PegasusHelper\api\ApiException;
 use SRAG\PegasusHelper\api\JsonResponse;
 use SRAG\PegasusHelper\api\ObjectDataMapper;
 use SRAG\PegasusHelper\api\Request;
@@ -18,6 +19,13 @@ use SRAG\PegasusHelper\api\Request;
  */
 final class ObjectController
 {
+    /**
+     * `?recursive=1` walks the whole subtree and runs a per-node checkAccess()
+     * call (see ObjectDataMapper::mapRefIds()); cap it so a request against a
+     * huge or near-root subtree can't be used to load the server.
+     */
+    private const MAX_RECURSIVE_NODES = 5000;
+
     /**
      * @var ObjectDataMapper
      */
@@ -50,6 +58,10 @@ final class ObjectController
         $tree = $DIC->repositoryTree();
 
         $refIds = $request->queryBool('recursive') ? $tree->getSubTreeIds($refId) : $tree->getChildIds($refId);
+
+        if (count($refIds) > self::MAX_RECURSIVE_NODES) {
+            throw ApiException::badRequest('Subtree is too large to return in one request (' . count($refIds) . ' nodes)');
+        }
 
         return new JsonResponse($this->mapper->mapRefIds($refIds));
     }

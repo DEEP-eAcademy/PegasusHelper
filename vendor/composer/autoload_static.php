@@ -63,6 +63,7 @@ class ComposerStaticInit2b5d13d6527733fa019edde33d82c8e1
         'SRAG\\PegasusHelper\\migration\\RestPluginMigration' => __DIR__ . '/../..' . '/classes/migration/RestPluginMigration.php',
         'SRAG\\PegasusHelper\\oauth\\ApiSettings' => __DIR__ . '/../..' . '/classes/oauth/ApiSettings.php',
         'SRAG\\PegasusHelper\\oauth\\RefreshTokenRepository' => __DIR__ . '/../..' . '/classes/oauth/RefreshTokenRepository.php',
+        'SRAG\\PegasusHelper\\oauth\\RevocationRepository' => __DIR__ . '/../..' . '/classes/oauth/RevocationRepository.php',
         'SRAG\\PegasusHelper\\oauth\\TokenCodec' => __DIR__ . '/../..' . '/classes/oauth/TokenCodec.php',
         'SRAG\\PegasusHelper\\oauth\\TokenService' => __DIR__ . '/../..' . '/classes/oauth/TokenService.php',
         'ilPegasusHelperConfigGUI' => __DIR__ . '/../..' . '/classes/class.ilPegasusHelperConfigGUI.php',

@@ -48,6 +48,7 @@ return array(
     'SRAG\\PegasusHelper\\migration\\RestPluginMigration' => $baseDir . '/classes/migration/RestPluginMigration.php',
     'SRAG\\PegasusHelper\\oauth\\ApiSettings' => $baseDir . '/classes/oauth/ApiSettings.php',
     'SRAG\\PegasusHelper\\oauth\\RefreshTokenRepository' => $baseDir . '/classes/oauth/RefreshTokenRepository.php',
+    'SRAG\\PegasusHelper\\oauth\\RevocationRepository' => $baseDir . '/classes/oauth/RevocationRepository.php',
     'SRAG\\PegasusHelper\\oauth\\TokenCodec' => $baseDir . '/classes/oauth/TokenCodec.php',
     'SRAG\\PegasusHelper\\oauth\\TokenService' => $baseDir . '/classes/oauth/TokenService.php',
     'ilPegasusHelperConfigGUI' => $baseDir . '/classes/class.ilPegasusHelperConfigGUI.php',

@@ -17,6 +17,7 @@ use SRAG\PegasusHelper\api\Router;
 use SRAG\PegasusHelper\authentication\AuthTokenRepository;
 use SRAG\PegasusHelper\oauth\ApiSettings;
 use SRAG\PegasusHelper\oauth\RefreshTokenRepository;
+use SRAG\PegasusHelper\oauth\RevocationRepository;
 use SRAG\PegasusHelper\oauth\TokenCodec;
 use SRAG\PegasusHelper\oauth\TokenService;
 
@@ -53,8 +54,19 @@ final class ApiProvider implements ServiceProviderInterface
             return new RefreshTokenRepository($DIC->database());
         });
 
+        $pimple[RevocationRepository::class] = $pimple->factory(function ($c) {
+            global $DIC;
+
+            return new RevocationRepository($DIC->database());
+        });
+
         $pimple[TokenService::class] = $pimple->factory(function ($c) {
-            return new TokenService($c[TokenCodec::class], $c[ApiSettings::class], $c[RefreshTokenRepository::class]);
+            return new TokenService(
+                $c[TokenCodec::class],
+                $c[ApiSettings::class],
+                $c[RefreshTokenRepository::class],
+                $c[RevocationRepository::class]
+            );
         });
 
         $pimple[ObjectDataMapper::class] = $pimple->factory(function ($c) {

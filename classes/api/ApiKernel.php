@@ -79,9 +79,26 @@ final class ApiKernel
         return $token['ilias_client'] ?? null;
     }
 
+    /**
+     * The WebView origins the ILIAS-Pegasus app's Angular HTTP client actually
+     * sends (its native downloader is a separate transport not subject to CORS
+     * at all, see file-download.ts). A capacitor:// origin is included for a
+     * future Capacitor-based build; it is unused today but harmless to allow.
+     */
+    private const ALLOWED_APP_ORIGINS = [
+        'ionic://localhost',
+        'capacitor://localhost',
+        'http://localhost',
+        'https://localhost',
+    ];
+
     private static function sendCorsHeaders(): void
     {
-        header('Access-Control-Allow-Origin: *');
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if (in_array($origin, self::ALLOWED_APP_ORIGINS, true)) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+        }
         header('Access-Control-Allow-Headers: Authorization, Accept, Content-Type');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Expose-Headers: ETag');

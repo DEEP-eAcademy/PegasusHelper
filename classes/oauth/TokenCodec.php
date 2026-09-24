@@ -12,6 +12,11 @@ namespace SRAG\PegasusHelper\oauth;
  *
  * Wire format: urlencode(base64("user_id,ilias_client,api_key,class,scope,misc,ttl,s,h"))
  *  - ttl is the absolute unix expiry time, as a decimal string.
+ *  - misc carries the token's issued-at unix time, as a decimal string, so a
+ *    revocation cutoff can be checked without adding a field to the wire format
+ *    (see {@see RevocationRepository}). Tokens minted by the REST plugin (or by
+ *    an older PegasusHelper) carry an empty `misc` and are treated as issued at
+ *    time 0 -- i.e. always older than any revocation cutoff.
  *  - s is a random string (25 chars for access tokens, 30 for refresh tokens).
  *  - h = sha256("salt-user_id-ilias_client-api_key-class-scope-misc-ttl-s")
  *
@@ -58,7 +63,7 @@ final class TokenCodec
             'api_key' => $apiKey,
             'class' => $class,
             'scope' => '',
-            'misc' => '',
+            'misc' => (string) time(),
             'ttl' => (string) (time() + ($ttlMinutes * 60)),
             's' => $this->randomString($entropy),
         ];
@@ -154,6 +159,19 @@ final class TokenCodec
     public static function isExpired(array $token): bool
     {
         return (int) $token['ttl'] <= time();
+    }
+
+    /**
+     * @param array $token
+     * @return int the token's issued-at unix time, or 0 for a token minted before
+     *              this field was introduced (REST plugin tokens, or tokens minted
+     *              by PegasusHelper < 7.1.0) -- always older than any revocation cutoff
+     */
+    public static function issuedAt(array $token): int
+    {
+        $misc = $token['misc'] ?? '';
+
+        return $misc === '' ? 0 : (int) $misc;
     }
 
     private function hash(array $token): string

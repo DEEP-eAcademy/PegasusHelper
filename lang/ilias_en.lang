@@ -9,7 +9,28 @@ txt_api_key#:#API Key
 txt_api_secret#:#API Secret
 txt_info_api_secret#:#Must match the secret configured in the ILIAS Pegasus app. Only change this if the app was configured with a different secret.
 msg_api_secret_saved#:#API secret saved successfully
-msg_api_secret_not_saved#:#API secret was not saved. It must not be empty
+msg_api_secret_not_saved#:#API secret was not saved. It must not be empty, and the token lifetimes must be at least 1 minute
+txt_access_token_ttl#:#Access token lifetime (minutes)
+txt_info_access_token_ttl#:#How long an app login stays valid before it must refresh. A leaked access token remains usable for this long.
+txt_refresh_token_ttl#:#Refresh token lifetime (minutes)
+txt_info_refresh_token_ttl#:#How long the app can stay logged in without the user re-entering credentials.
+form_revoke_user#:#Revoke Tokens for a User
+txt_username#:#ILIAS Username
+txt_info_revoke_user#:#Invalidates every access and refresh token already issued to this user's app installation(s). They will need to log in again. Does not affect a login started after this action.
+button_revoke#:#Revoke
+msg_revoke_user_done#:#All tokens for this user have been revoked
+msg_revoke_user_not_found#:#No such ILIAS user was found
+form_revoke_all#:#Revoke All Tokens
+txt_info_revoke_all#:#Invalidates every access and refresh token already issued to every user of the app. Everyone will need to log in again. Use this if an app token may have been exposed.
+button_revoke_all#:#Revoke All
+msg_revoke_all_done#:#All tokens for all users have been revoked
+form_rotate_salt#:#Rotate Token Signing Salt
+txt_info_rotate_salt#:#Generates a new random signing salt, which instantly invalidates every access and refresh token ever issued, for every user, permanently (unlike the two actions above, this cannot be undone by reverting other settings). Use this if the signing salt itself may have been exposed.
+button_rotate_salt#:#Rotate Salt
+msg_rotate_salt_done#:#The signing salt has been rotated. All previously issued tokens are now invalid
+txt_type_to_confirm_pre#:#Type
+txt_type_to_confirm_post#:#below to confirm
+msg_confirm_mismatch#:#Confirmation text did not match. Nothing was changed
 form_coloring#:#Coloring
 form_icon#:#Icons
 button_reset#:#Reset

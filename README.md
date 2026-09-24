@@ -104,6 +104,24 @@ fastcgi_param PATH_INFO $fastcgi_path_info;
 fastcgi_param HTTP_AUTHORIZATION $http_authorization;
 ```
 
+### Keep `testing/` out of production
+`testing/` is a CLI diagnostic tool, not part of the app-facing API, and must
+not be reachable over HTTP: it can write logs containing configuration
+details, and `testing/external/run.php` (meant to be deployed on a *separate*
+host to check reachability from outside) makes outbound requests to a
+caller-supplied host, so exposing it is effectively an open SSRF endpoint.
+Apache is covered by the included `testing/.htaccess` (`Require all denied`).
+For nginx, add:
+```nginx
+location ~ ^/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/testing/ {
+    deny all;
+    return 403;
+}
+```
+If you do deploy `testing/external/run.php` on a separate host, copy
+`secret.php.dist` to `secret.php` there and set a random secret first --
+the script refuses every request until that file exists.
+
 ## Versioning
 We use SemVer for versioning. For the versions available, see the tags on this repository.
 

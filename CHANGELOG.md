@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [7.1.0]
+### Added
+- Token revocation: an admin can invalidate every access/refresh token already
+  issued to one user, or to everyone at once, from the plugin's 'General' tab
+  (`oauth\RevocationRepository`) -- access tokens were previously stateless and
+  had no way to be individually killed before they expired
+- A "rotate signing salt" admin action, which instantly and permanently
+  invalidates every token ever issued, for when the salt itself may have leaked
+- Editable access/refresh token TTLs on the 'General' tab, so an admin can
+  shorten them without direct database access
+### Changed
+- Much shorter default token TTLs for brand-new installs (1 hour / 90 days,
+  down from the REST plugin's inherited ~6.8 / ~8.6 years) in
+  `migration\RestPluginMigration`; installs migrated from the REST plugin keep
+  its actual TTL values unless changed via the new 'General' tab fields
+- `testing/external/run.php` now requires a shared secret (`secret.php`, not
+  committed; see `secret.php.dist`) and rejects targets that resolve to a
+  private/loopback/reserved address; previously any caller could make the
+  server issue arbitrary outbound GET requests (SSRF) via `?host=`
+- `Access-Control-Allow-Origin` (in `api.php` and the resource-link handler) is
+  now restricted to the app's actual WebView origins instead of `*`
+### Added (deployment)
+- `testing/.htaccess` denies all HTTP access to the `testing/` tree (a CLI
+  diagnostic tool that should never be web-reachable); see the README for the
+  nginx equivalent
+### Fixed
+- **`TokenService::issuePair()` hashed the raw, still-urlencoded refresh token
+  for storage, while `refresh()` hashed the normalised (decoded) form for
+  lookup.** Serializing a token urlencodes its base64 output, which routinely
+  contains `+`, `/` or `=` and thus gets percent-escaped; whenever that
+  happened, the very first refresh attempt for a brand-new login would fail
+  unpredictably with "Refresh token has been revoked". Found while adding the
+  revocation tests above; not related to the REST-plugin merge itself, but a
+  real, silent, order-of-magnitude-more-likely-than-not bug in the code this
+  release also modifies.
+- `$_GET['target']` is now normalised to a string before any handler runs
+  (`ExcludedHandlerImpl`); a request like `?target[]=x` previously threw an
+  uncaught `TypeError` deep inside whichever redirect handler ran next
+- `GET /v2/ilias-app/objects/{refId}?recursive=1` now caps the returned subtree
+  at 5000 nodes instead of walking (and `checkAccess()`-ing) an unbounded one
+
 ## [7.0.0]
 ### Added
 - Self-contained JSON API at `api.php`, serving every route the ILIAS-Pegasus

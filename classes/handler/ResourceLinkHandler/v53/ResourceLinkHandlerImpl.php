@@ -26,6 +26,18 @@ final class ResourceLinkHandlerImpl extends BaseHandler implements ResourceLinkH
 	const GET_TARGET = 'target';
 
 	/**
+	 * The WebView origins the ILIAS-Pegasus app's Angular HTTP client actually
+	 * sends. Its native downloader (the transport this route is really meant
+	 * for) is a separate mechanism not subject to CORS at all.
+	 */
+	private const ALLOWED_APP_ORIGINS = [
+		'ionic://localhost',
+		'capacitor://localhost',
+		'http://localhost',
+		'https://localhost',
+	];
+
+	/**
 	 * @var UserTokenAuthenticator $authenticator
 	 */
 	private $authenticator;
@@ -92,11 +104,16 @@ final class ResourceLinkHandlerImpl extends BaseHandler implements ResourceLinkH
 			self::$self_call = true;
 
 			//set CORS header
+			$origin = $this->http->request()->getHeaderLine('Origin');
 			$response = $this->http->response()
-				->withHeader('Access-Control-Allow-Origin', '*')
-				->withHeader('Access-Control-Allow-Headers', '*')
+				->withHeader('Access-Control-Allow-Headers', 'Authorization, Accept, Content-Type')
 				->withHeader('Access-Control-Allow-Methods', 'GET')
 				->withHeader('Access-Control-Max-Age', '600');
+			if (in_array($origin, self::ALLOWED_APP_ORIGINS, true)) {
+				$response = $response
+					->withHeader('Access-Control-Allow-Origin', $origin)
+					->withHeader('Vary', 'Origin');
+			}
 
 			$this->http->saveResponse($response);
 

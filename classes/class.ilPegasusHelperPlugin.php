@@ -64,6 +64,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
             $ilDB->dropTable("ui_uihk_pegasus_config", $error_if_not_existing);
             $ilDB->dropTable("ui_uihk_pegasus_refresh", $error_if_not_existing);
             $ilDB->dropTable("ui_uihk_pegasus_token", $error_if_not_existing);
+            $ilDB->dropTable("ui_uihk_pegasus_revocation", $error_if_not_existing);
 
             return true;
         } catch (Exception $e) {

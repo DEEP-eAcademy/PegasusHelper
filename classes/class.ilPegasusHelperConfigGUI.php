@@ -106,10 +106,24 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
             case "general_save_secret":
                 $this->saveApiSecret();
                 break;
+            case "general_revoke_all":
+                $this->revokeAllTokens();
+                break;
+            case "general_revoke_user":
+                $this->revokeUserTokens();
+                break;
+            case "general_rotate_salt":
+                $this->rotateSigningSalt();
+                break;
             case "general":
             default:
                 $ilTabs->setSubTabActive("id_general");
-                $tpl->setContent($this->getApiSecretFormHtml());
+                $tpl->setContent(
+                    $this->getApiSecretFormHtml()
+                    . $this->getRevokeUserFormHtml()
+                    . $this->getRevokeAllFormHtml()
+                    . $this->getRotateSaltFormHtml()
+                );
                 break;
         }
     }
@@ -144,20 +158,39 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $apiSecret->setRequired(true);
         $form->addItem($apiSecret);
 
+        $accessTtl = new ilNumberInputGUI($this->pl->txt("txt_access_token_ttl"), "access_token_ttl");
+        $accessTtl->setInfo($this->pl->txt("txt_info_access_token_ttl"));
+        $accessTtl->setValue((string) $settings->getAccessTokenTtlMinutes());
+        $accessTtl->setSize(10);
+        $accessTtl->setMinValue(1);
+        $accessTtl->setRequired(true);
+        $form->addItem($accessTtl);
+
+        $refreshTtl = new ilNumberInputGUI($this->pl->txt("txt_refresh_token_ttl"), "refresh_token_ttl");
+        $refreshTtl->setInfo($this->pl->txt("txt_info_refresh_token_ttl"));
+        $refreshTtl->setValue((string) $settings->getRefreshTokenTtlMinutes());
+        $refreshTtl->setSize(10);
+        $refreshTtl->setMinValue(1);
+        $refreshTtl->setRequired(true);
+        $form->addItem($refreshTtl);
+
         $form->addCommandButton("general_save_secret", $this->pl->txt("button_save"));
 
         return $form->getHTML();
     }
 
     /**
-     * saves the (admin-editable) ilias_pegasus API secret
+     * saves the (admin-editable) ilias_pegasus API secret and the token TTLs
      */
     protected function saveApiSecret()
     {
         global $ilDB, $ilCtrl, $tpl;
 
         $secret = trim($_POST["api_secret"] ?? "");
-        if ($secret === "") {
+        $accessTtl = (int) ($_POST["access_token_ttl"] ?? 0);
+        $refreshTtl = (int) ($_POST["refresh_token_ttl"] ?? 0);
+
+        if ($secret === "" || $accessTtl < 1 || $refreshTtl < 1) {
             $tpl->setOnScreenMessage('failure', $this->pl->txt("msg_api_secret_not_saved"), true);
             $ilCtrl->redirect($this, "general");
             return;
@@ -165,8 +198,144 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
 
         $settings = new \SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
         $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_API_SECRET, $secret);
+        $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_ACCESS_TOKEN_TTL, (string) $accessTtl);
+        $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_REFRESH_TOKEN_TTL, (string) $refreshTtl);
 
         $tpl->setOnScreenMessage('success', $this->pl->txt("msg_api_secret_saved"), true);
+        $ilCtrl->redirect($this, "general");
+    }
+
+    /**
+     * html of the form to revoke all tokens issued to one specific user
+     * @return string
+     */
+    protected function getRevokeUserFormHtml()
+    {
+        global $ilCtrl;
+
+        $form = new ilPropertyFormGUI();
+        $form->setTitle($this->pl->txt("form_revoke_user"));
+
+        $info = new ilNonEditableValueGUI("", "", true);
+        $info->setValue($this->pl->txt("txt_info_revoke_user"));
+        $form->addItem($info);
+
+        $login = new ilTextInputGUI($this->pl->txt("txt_username"), "revoke_login");
+        $form->addItem($login);
+
+        $form->setFormAction($ilCtrl->getFormAction($this));
+        $form->addCommandButton("general_revoke_user", $this->pl->txt("button_revoke"));
+
+        return $form->getHTML();
+    }
+
+    /**
+     * revokes every app token (access + refresh) already issued to one user, by login
+     */
+    protected function revokeUserTokens()
+    {
+        global $ilDB, $ilCtrl, $tpl;
+
+        $login = trim($_POST["revoke_login"] ?? "");
+        $userId = $login !== "" ? \ilObjUser::_lookupId($login) : 0;
+
+        if (!$userId) {
+            $tpl->setOnScreenMessage('failure', $this->pl->txt("msg_revoke_user_not_found"), true);
+            $ilCtrl->redirect($this, "general");
+            return;
+        }
+
+        (new \SRAG\PegasusHelper\oauth\RevocationRepository($ilDB))->revokeUser((int) $userId);
+
+        $tpl->setOnScreenMessage('success', $this->pl->txt("msg_revoke_user_done"), true);
+        $ilCtrl->redirect($this, "general");
+    }
+
+    /**
+     * html of the form to revoke every app token for every user
+     * @return string
+     */
+    protected function getRevokeAllFormHtml()
+    {
+        global $ilCtrl;
+
+        $form = new ilPropertyFormGUI();
+        $form->setTitle($this->pl->txt("form_revoke_all"));
+
+        $info = new ilNonEditableValueGUI("", "", true);
+        $info->setValue($this->pl->txt("txt_info_revoke_all"));
+        $form->addItem($info);
+
+        $confirm = new ilTextInputGUI($this->pl->txt("txt_type_to_confirm_pre") . " REVOKE " . $this->pl->txt("txt_type_to_confirm_post"), "confirm_revoke_all");
+        $form->addItem($confirm);
+
+        $form->setFormAction($ilCtrl->getFormAction($this));
+        $form->addCommandButton("general_revoke_all", $this->pl->txt("button_revoke_all"));
+
+        return $form->getHTML();
+    }
+
+    /**
+     * revokes every app token (access + refresh) already issued to every user
+     */
+    protected function revokeAllTokens()
+    {
+        global $ilDB, $ilCtrl, $tpl;
+
+        if (trim($_POST["confirm_revoke_all"] ?? "") !== "REVOKE") {
+            $tpl->setOnScreenMessage('failure', $this->pl->txt("msg_confirm_mismatch"), true);
+            $ilCtrl->redirect($this, "general");
+            return;
+        }
+
+        (new \SRAG\PegasusHelper\oauth\RevocationRepository($ilDB))->revokeAll();
+
+        $tpl->setOnScreenMessage('success', $this->pl->txt("msg_revoke_all_done"), true);
+        $ilCtrl->redirect($this, "general");
+    }
+
+    /**
+     * html of the form to rotate the token signing salt
+     * @return string
+     */
+    protected function getRotateSaltFormHtml()
+    {
+        global $ilCtrl;
+
+        $form = new ilPropertyFormGUI();
+        $form->setTitle($this->pl->txt("form_rotate_salt"));
+
+        $info = new ilNonEditableValueGUI("", "", true);
+        $info->setValue($this->pl->txt("txt_info_rotate_salt"));
+        $form->addItem($info);
+
+        $confirm = new ilTextInputGUI($this->pl->txt("txt_type_to_confirm_pre") . " ROTATE " . $this->pl->txt("txt_type_to_confirm_post"), "confirm_rotate_salt");
+        $form->addItem($confirm);
+
+        $form->setFormAction($ilCtrl->getFormAction($this));
+        $form->addCommandButton("general_rotate_salt", $this->pl->txt("button_rotate_salt"));
+
+        return $form->getHTML();
+    }
+
+    /**
+     * rotates the token signing salt, which instantly invalidates every
+     * already-issued token (its signature no longer matches)
+     */
+    protected function rotateSigningSalt()
+    {
+        global $ilDB, $ilCtrl, $tpl;
+
+        if (trim($_POST["confirm_rotate_salt"] ?? "") !== "ROTATE") {
+            $tpl->setOnScreenMessage('failure', $this->pl->txt("msg_confirm_mismatch"), true);
+            $ilCtrl->redirect($this, "general");
+            return;
+        }
+
+        $settings = new \SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
+        $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_SALT, bin2hex(random_bytes(32)));
+
+        $tpl->setOnScreenMessage('success', $this->pl->txt("msg_rotate_salt_done"), true);
         $ilCtrl->redirect($this, "general");
     }
 

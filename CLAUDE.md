@@ -75,7 +75,7 @@ The plugin uses a custom DI container for service provisioning:
 - **Service Providers:**
   - `AuthenticationProvider` — registers authentication services (`authentication\AuthTokenRepository`, the SSO one-time-token repository; `UserTokenAuthenticator`)
   - `Ilias6RequestHandlerProvider` — registers the handler chain (the only provider still wired up; the historical `Ilias53RequestHandlerProvider`/`Ilias54RequestHandlerProvider` were dead code and have been removed)
-  - `ApiProvider` — registers the OAuth services (`oauth\TokenCodec`/`TokenService`/`ApiSettings`/`RefreshTokenRepository`), the request mapping helpers, and the `api\Router` route table (see below)
+  - `ApiProvider` — registers the OAuth services (`oauth\TokenCodec`/`TokenService`/`ApiSettings`/`RefreshTokenRepository`/`RevocationRepository`), the request mapping helpers, and the `api\Router` route table (see below)
 
 The container validates ILIAS version >= 9.0 at bootstrap time and throws `DependencyResolutionException` if requirements aren't met. (The plugin manifest itself now restricts installation to ILIAS 10.x via `$ilias_min_version`/`$ilias_max_version` in `plugin.php`.)
 
@@ -96,6 +96,7 @@ The container validates ILIAS version >= 9.0 at bootstrap time and throws `Depen
 - **`TokenService`** — issues/validates the token pair; used by both `OauthManagerImpl` (initial login) and `api\controller\TokenController` (refresh).
 - **`ApiSettings`** — repository over `ui_uihk_pegasus_config` (API key/secret, signing salt, token TTLs).
 - **`RefreshTokenRepository`** — repository over `ui_uihk_pegasus_refresh`; backs both refresh-token validation and the Statistics tab.
+- **`RevocationRepository`** — repository over `ui_uihk_pegasus_revocation`. Access tokens are otherwise stateless and can't be individually killed before they expire; this is the one exception, giving the 'General' tab's "Revoke" actions a way to invalidate every already-issued token for a user (or globally, under the reserved user id `0`) by checking a stored cutoff against the token's issued-at time. That issued-at time rides in the token's existing (previously always-empty) `misc` field, so the wire format itself never changed — see `TokenCodec::issuedAt()`. A token minted before this feature existed (`misc=''`) is treated as issued at time zero, i.e. revoked by any cutoff at all.
 
 ### Authentication (`classes/authentication/`)
 

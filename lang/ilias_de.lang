@@ -9,7 +9,28 @@ txt_api_key#:#API-Schlüssel
 txt_api_secret#:#API-Geheimnis
 txt_info_api_secret#:#Muss mit dem in der ILIAS Pegasus App konfigurierten Geheimnis übereinstimmen. Nur ändern, wenn die App mit einem abweichenden Geheimnis konfiguriert wurde.
 msg_api_secret_saved#:#Das API-Geheimnis wurde gespeichert
-msg_api_secret_not_saved#:#Das API-Geheimnis konnte nicht gespeichert werden. Es darf nicht leer sein
+msg_api_secret_not_saved#:#Das API-Geheimnis konnte nicht gespeichert werden. Es darf nicht leer sein, und die Token-Gültigkeitsdauer muss mindestens 1 Minute betragen
+txt_access_token_ttl#:#Gültigkeitsdauer Access-Token (Minuten)
+txt_info_access_token_ttl#:#Wie lange ein App-Login gültig bleibt, bevor er erneuert werden muss. Ein geleaktes Access-Token bleibt so lange nutzbar.
+txt_refresh_token_ttl#:#Gültigkeitsdauer Refresh-Token (Minuten)
+txt_info_refresh_token_ttl#:#Wie lange die App eingeloggt bleiben kann, ohne dass die Zugangsdaten erneut eingegeben werden müssen.
+form_revoke_user#:#Tokens eines Benutzers widerrufen
+txt_username#:#ILIAS-Benutzername
+txt_info_revoke_user#:#Widerruft alle bereits ausgestellten Access- und Refresh-Tokens dieses Benutzers. Er muss sich danach erneut anmelden. Ein danach gestarteter Login ist nicht betroffen.
+button_revoke#:#Widerrufen
+msg_revoke_user_done#:#Alle Tokens dieses Benutzers wurden widerrufen
+msg_revoke_user_not_found#:#Es wurde kein ILIAS-Benutzer mit diesem Namen gefunden
+form_revoke_all#:#Alle Tokens widerrufen
+txt_info_revoke_all#:#Widerruft alle bereits ausgestellten Access- und Refresh-Tokens aller Benutzer. Alle müssen sich danach erneut anmelden. Verwenden, falls ein App-Token offengelegt worden sein könnte.
+button_revoke_all#:#Alle widerrufen
+msg_revoke_all_done#:#Alle Tokens aller Benutzer wurden widerrufen
+form_rotate_salt#:#Signatur-Salt rotieren
+txt_info_rotate_salt#:#Erzeugt ein neues zufälliges Signatur-Salt, wodurch sofort und dauerhaft jedes je ausgestellte Access- und Refresh-Token aller Benutzer ungültig wird (im Gegensatz zu den beiden obigen Aktionen kann dies nicht rückgängig gemacht werden). Verwenden, falls das Salt selbst offengelegt worden sein könnte.
+button_rotate_salt#:#Salt rotieren
+msg_rotate_salt_done#:#Das Signatur-Salt wurde rotiert. Alle zuvor ausgestellten Tokens sind jetzt ungültig
+txt_type_to_confirm_pre#:#Zur Bestätigung
+txt_type_to_confirm_post#:#unten eingeben
+msg_confirm_mismatch#:#Der Bestätigungstext stimmte nicht überein. Es wurde nichts geändert
 form_coloring#:#Farbwahl
 form_icon#:#Icons
 button_reset#:#Zurücksetzen

@@ -17,6 +17,14 @@ final class ExcludedHandlerImpl extends BaseHandler implements ExcludedHandler
 {
     public function handle()
     {
+        // Every downstream handler in the chain reads $_GET['target'] directly
+        // and expects a string (preg_match()/strcmp() against it); a request
+        // like ?target[]=x would otherwise throw a TypeError deep in whichever
+        // handler runs next. Normalise it once, here, since this handler always
+        // runs first (see ilPegasusHelperUIHookGUI).
+        if (isset($_GET['target']) && !is_string($_GET['target'])) {
+            $_GET['target'] = '';
+        }
 
         //if not excluded call next request handler
         if (!$this->isExcluded()) {
