@@ -11,6 +11,7 @@ use SRAG\PegasusHelper\handler\OAuthManager\OAuthManager;
 use SRAG\PegasusHelper\handler\OAuthManager\v52\OauthManagerImpl;
 use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\RefLinkRedirectHandler;
 use SRAG\PegasusHelper\handler\ResourceLinkHandler\ResourceLinkHandler;
+use SRAG\PegasusHelper\handler\SessionGuard\SessionGuard;
 
 require_once __DIR__ . '/../bootstrap.php';
 
@@ -35,7 +36,13 @@ final class ilPegasusHelperUIHookGUI extends ilUIHookPluginGUI
      */
     public function __construct()
     {
-        $this->handlers = PegasusHelperContainer::resolve(ExcludedHandler::class);
+        // SessionGuard must run before ExcludedHandler, not after: that
+        // handler short-circuits the whole chain for ordinary repository
+        // browsing (any $_GET['target'] not starting with 'ilias_app'), which
+        // is exactly when a revoked SSO-derived session needs to be caught --
+        // see SessionGuardImpl's docblock (SEC-02).
+        $this->handlers = PegasusHelperContainer::resolve(SessionGuard::class);
+        $this->handlers->add(PegasusHelperContainer::resolve(ExcludedHandler::class));
         $this->handlers->add(PegasusHelperContainer::resolve(OauthManager::class));
 
         if ($this->hasContainerService('ilCtrl')) {

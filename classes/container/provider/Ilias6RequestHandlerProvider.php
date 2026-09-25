@@ -21,6 +21,9 @@ use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\RefLinkRedirectHandler;
 use SRAG\PegasusHelper\handler\RefLinkRedirectHandler\v54\RefLinkRedirectHandlerImpl;
 use SRAG\PegasusHelper\handler\ResourceLinkHandler\ResourceLinkHandler;
 use SRAG\PegasusHelper\handler\ResourceLinkHandler\v53\ResourceLinkHandlerImpl;
+use SRAG\PegasusHelper\handler\SessionGuard\SessionGuard;
+use SRAG\PegasusHelper\handler\SessionGuard\v1\SessionGuardImpl;
+use SRAG\PegasusHelper\oauth\GrantGuard;
 use SRAG\PegasusHelper\oauth\TokenService;
 
 /**
@@ -51,7 +54,11 @@ final class Ilias6RequestHandlerProvider implements ServiceProviderInterface
         });
 
         $pimple[OAuthManager::class] = $pimple->factory(function ($c) {
-            return new OauthManagerImpl($c[TokenService::class], $c[AuditLog::class]);
+            return new OauthManagerImpl($c[TokenService::class], $c[AuditLog::class], $c[GrantGuard::class]);
+        });
+
+        $pimple[SessionGuard::class] = $pimple->factory(function ($c) {
+            return new SessionGuardImpl($c[GrantGuard::class], $c[AuditLog::class]);
         });
 
         $pimple[RefLinkRedirectHandler::class] = $pimple->factory(function ($c) {

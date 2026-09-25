@@ -65,6 +65,7 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
             $ilDB->dropTable("ui_uihk_peg_refresh", $error_if_not_existing);
             $ilDB->dropTable("ui_uihk_peg_token", $error_if_not_existing);
             $ilDB->dropTable("ui_uihk_peg_revoke", $error_if_not_existing);
+            $ilDB->dropTable("ui_uihk_peg_family", $error_if_not_existing);
             // Also clean up the orphaned table from installs that hit the
             // table-name-length bug fixed in sql/dbupdate.php step #13.
             $ilDB->dropTable("ui_uihk_pegasus_config", $error_if_not_existing);

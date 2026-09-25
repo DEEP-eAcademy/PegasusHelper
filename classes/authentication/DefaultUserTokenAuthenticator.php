@@ -64,9 +64,9 @@ final class DefaultUserTokenAuthenticator implements UserTokenAuthenticator
         $previousUserId = (int) $user->getId();
         $previousUserId = $previousUserId > 0 ? $previousUserId : null;
 
-        $status = $this->tokens->consume((int) $userId, (string) $token);
+        $consumption = $this->tokens->consume((int) $userId, (string) $token);
 
-        if ($status === AuthTokenRepository::STATUS_CONSUMED) {
+        if ($consumption->isConsumed()) {
             // log in user
             $ilAuthSession->regenerateId();
             $ilAuthSession->setUserId((int) $userId);
@@ -75,14 +75,33 @@ final class DefaultUserTokenAuthenticator implements UserTokenAuthenticator
             $user->setId((int) $userId);
             $user->read();
 
+            // Marks this web session as one derived from an app SSO token, so
+            // SessionGuardImpl can log it out promptly if the login it came
+            // from is later revoked (SEC-02) -- otherwise a browser session
+            // opened this way would keep working indefinitely, outliving the
+            // very login it was meant to inherit its validity from.
+            $grant = $consumption->getGrant();
+            if ($grant !== null) {
+                \ilSession::set('pegasus_grant', [
+                    'uid' => $grant->getUserId(),
+                    'auth' => $grant->getAuthTime(),
+                    'fam' => $grant->getFamilyId(),
+                    'chk' => time(),
+                ]);
+            }
+
             $this->audit->setActor((int) $userId);
             $this->audit->log(AuditLog::EVENT_SSO_LOGIN, AuditLog::LEVEL_INFO, $auditContext);
 
             return;
         }
 
-        $reason = $status === AuthTokenRepository::STATUS_EXPIRED ? 'sso_token_expired' : 'sso_token_unknown';
-        $level = $reason === 'sso_token_expired' ? AuditLog::LEVEL_INFO : AuditLog::LEVEL_WARNING;
+        $status = $consumption->getStatus();
+        $reasons = [
+            AuthTokenRepository::STATUS_EXPIRED => ['sso_token_expired', AuditLog::LEVEL_INFO],
+            AuthTokenRepository::STATUS_REVOKED => ['sso_token_revoked', AuditLog::LEVEL_WARNING],
+        ];
+        [$reason, $level] = $reasons[$status] ?? ['sso_token_unknown', AuditLog::LEVEL_WARNING];
 
         $fields = $auditContext;
         $fields['reason'] = $reason;
