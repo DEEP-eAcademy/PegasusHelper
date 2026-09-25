@@ -107,6 +107,53 @@ logged in stay logged in:
    app to call the new URL, uninstall the REST plugin in the ILIAS Plugin
    Administration, and remove its directory.
 
+### Upgrading to 7.3.0 (security hardening)
+
+7.3.0 closes a set of issues found in an external security review (see
+`CHANGELOG.md`). Nothing about the update logs out an app that is already
+logged in, and no API route or response shape changed. Three follow-ups are
+worth doing right after updating:
+
+1. **Rebuild ILIAS's ctrl-structure artifacts** (`php cli/setup.php build`,
+   from your ILIAS root), so `ilPegasusHelperConfigGUI`'s new CSRF protection
+   takes effect. Until you do this, the plugin's own runtime checks (HTTP
+   method + a `write`-permission check) still protect its admin actions.
+2. Check the 'General' tab for a "weak signing salt" warning. If you see one,
+   rotate the salt there (this logs every app installation out and forces a
+   fresh login).
+3. Decide whether you want a **maximum login age** (also on the 'General'
+   tab; `0` = unlimited, the default). Once set, the app must present real
+   credentials again after that many days, even if it has kept refreshing.
+
+If you had deployed the old `testing/external/run.php` diagnostic on a
+separate host, delete it there and treat its shared secret -- and anything
+written to its `check.log` -- as leaked; see "Keep `testing/` out of
+production" below.
+
+Two optional, defence-in-depth deployment steps:
+
+- **Edge-level emergency block.** Deactivating the plugin makes `api.php`
+  return 503 to every request, but going through a web server/reverse-proxy
+  rule is faster in an incident and doesn't depend on ILIAS's own state. nginx
+  example:
+  ```nginx
+  location = /Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/api.php {
+      return 503;
+  }
+  ```
+  Use this alongside the plugin's own "Revoke" actions, not instead of them:
+  blocking the endpoint doesn't invalidate any already-issued token, it only
+  stops it from being *used* while the block is in place.
+- **Rate limiting.** `api.php` has no built-in request-rate limiting. For a
+  public-facing installation, consider bounding requests per client at the
+  web server, e.g. nginx:
+  ```nginx
+  limit_req_zone $binary_remote_addr zone=pegasus_api:10m rate=30r/s;
+  location ~ ^/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/api\.php {
+      limit_req zone=pegasus_api burst=60 nodelay;
+  }
+  ```
+
 ### `PATH_INFO` and the `Authorization` header (nginx)
 
 `api.php` reads its route from `PATH_INFO` and reads the Bearer token from the
@@ -125,11 +172,8 @@ fastcgi_param HTTP_AUTHORIZATION $http_authorization;
 
 `testing/` is a CLI diagnostic tool, not part of the app-facing API, and must
 not be reachable over HTTP: it can write logs containing configuration
-details, and `testing/external/run.php` (meant to be deployed on a _separate_
-host to check reachability from outside) makes outbound requests to a
-caller-supplied host, so exposing it is effectively an open SSRF endpoint.
-Apache is covered by the included `testing/.htaccess` (`Require all denied`).
-For nginx, add:
+details. Apache is covered by the included `testing/.htaccess`
+(`Require all denied`). For nginx, add:
 
 ```nginx
 location ~ ^/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/PegasusHelper/testing/ {
@@ -138,17 +182,23 @@ location ~ ^/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/P
 }
 ```
 
-If you do deploy `testing/external/run.php` on a separate host, copy
-`secret.php.dist` to `secret.php` there and set a random secret first --
-the script refuses every request until that file exists.
+Versions before 7.3.0 shipped a `testing/external/run.php` diagnostic meant to
+be deployed on a separate host to check reachability from outside. It has been
+removed (see the 7.3.0 changelog entry): its own internal diagnostics already
+cover `api.php` reachability and the `Authorization` header from the CLI
+script above. If you had deployed it on a separate host, delete it there and
+treat its shared secret -- and anything logged to its `check.log` -- as
+leaked.
 
 ## Audit logging
 
 Every security- or audit-relevant event -- app/SSO logins, token issuance,
-refresh and rejection (with a reason), file and learning-module downloads, and
-admin changes to the API secret, token TTLs, revocations, the signing salt and
-the app theme -- is written as a single-line, structured entry to ILIAS's own
-logging system, on a dedicated channel:
+refresh and rejection (with a reason), a detected refresh-token replay, a
+browser session terminated because its login was revoked, file and
+learning-module downloads, a rejected admin action, and admin changes to the
+API secret, token TTLs, revocations, the signing salt and the app theme -- is
+written as a single-line, structured entry to ILIAS's own logging system, on a
+dedicated channel:
 
 ```
 PEGASUS_AUDIT {"event":"auth.app_login","ts":"2025-01-01T12:00:00+00:00","request_id":"a1b2c3d4e5f6a7b8","client":"default","user_id":6,"login":"jdoe","ip":"203.0.113.7","forwarded_for":null,"user_agent":"...","refresh_fp":"9f2c...","access_expires_in":3600}

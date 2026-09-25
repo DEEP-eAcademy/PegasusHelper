@@ -4,6 +4,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [7.3.0]
+Fixes for a set of issues found in an external security review of the OAuth/SSO
+token handling, the admin configuration screen, the standalone `api.php` API and
+the diagnostic tooling. Upgrading does not log out any app that is already
+logged in, does not change any API route or response shape, and needs no app
+update. See the README's "Upgrading to 7.3.0" section for the (optional)
+follow-up steps after updating.
+### Added
+- **Login families and grants** (`oauth\Grant`, `GrantGuard`,
+  `GrantFamilyRepository`, table `ui_uihk_peg_family`): every access token,
+  refresh token and SSO auth-token minted from one app login now carries that
+  login's original authentication time and a family id, inherited unchanged by
+  every successor a refresh mints. A revocation cutoff is now checked against
+  that original time rather than a token's own issued-at time, which closes a
+  race where a refresh completing concurrently with a revocation could still
+  produce a valid, un-revoked successor token
+- **Refresh-token rotation and replay detection**
+  (`RefreshTokenRepository::claimRotation()`): every refresh now atomically
+  rotates the refresh token. A second presentation of an already-rotated token
+  within a short grace window is tolerated (the app fires concurrent refreshes
+  with no mutex of its own), but a presentation after that window revokes the
+  token's whole login family, immediately invalidating every access/refresh
+  token derived from it -- previously a refresh token stayed valid,
+  unconditionally, until its own TTL expired, so a stolen refresh token could
+  be replayed indefinitely alongside the legitimate app
+- **Refresh-time account eligibility check**: `POST /v2/oauth2/token` now also
+  rejects a deactivated, deleted or time-limited-out user, matching every
+  Bearer route -- previously this route never re-checked the account at all
+- An optional **maximum login age** setting (General tab, days; `0` =
+  unlimited, the default): once set, a login must be re-established with real
+  credentials after that many days, no matter how often it has refreshed
+- A **"terminate this user's ILIAS web sessions" checkbox** (checked by
+  default) on the "Revoke Tokens for a User" form, and automatic termination
+  of every outstanding SSO auth-token and login family whenever a user (or
+  everyone) is revoked, or the signing salt is rotated -- previously revocation
+  only touched the cutoff used by access/refresh token validation; an SSO
+  token already issued, or a browser session already opened from one, kept
+  working regardless
+- `SessionGuard` (`classes/handler/SessionGuard/`): a browser session opened
+  from an app SSO link is now periodically re-checked against the same
+  revocation rules and logged out if its login has been revoked, and
+  `OauthManagerImpl` refuses to mint a fresh token pair for such a session
+  instead of silently issuing a brand-new, un-revoked one
+- `api\PluginGate`: `api.php` now returns 503 for every route if the plugin
+  itself is not active/installed/compatible, so deactivating it from
+  Administration > Plugins works as an actual emergency stop for the
+  standalone API, not only for the UI-hook integration points
+- Request-body size limit (64 KiB, 413 if exceeded) in `api\Request`, checked
+  before the body is read in full
+- A visible/read access check on the repository root of
+  `GET /v2/ilias-app/objects/{refId}` before it is traversed
+- `api\ArchiveBudget` and locking/atomic-write changes in
+  `LearningModuleZipBuilder`: a learning-module zip build is now serialized
+  per module (an `flock()` lock file), written to a temp file and `rename()`d
+  into place only once complete, and bounded by entry count, per-entry and
+  total uncompressed size, and compression ratio, checked *before* an entry is
+  decompressed; a symlinked file inside a legacy module directory is now
+  skipped rather than followed
+- `ilPegasusHelperConfigGUI` implements `ilCtrlSecurityInterface`: every
+  state-changing admin command is now CSRF-protected by ILIAS's own `ilCtrl`
+  (once `php cli/setup.php build` has been re-run) and additionally enforced
+  at runtime regardless -- an actual `POST` is required, and a `write`
+  RBAC check against the Plugins administration node is performed, since
+  `ilObjComponentSettingsGUI` itself only ever checks `read` before forwarding
+  to a plugin's config screen. Two of these commands (`theme_reset_colors`,
+  `theme_reset_icons`) previously mutated state on a plain `GET`
+- A "weak signing salt" warning on the General tab if the configured salt is
+  shorter than a reasonable minimum
+### Changed
+- `ApiSettings::requireSalt()`/`requireApiKey()`/`requireApiSecret()` (and a
+  new `TokenCodec` constructor check) now throw instead of returning `''`: a
+  missing or empty signing salt or API secret previously meant every token
+  signature check (or, for the secret, `hash_equals('', '')`) would pass,
+  letting anyone forge an arbitrary user's access token. A database update
+  step repairs an install that already has one of these empty; the General
+  tab's forms and `RestPluginMigration` also no longer let a save/migration
+  leave any of them empty
+- Admin form input (`ilPegasusHelperConfigGUI`) is now read via ILIAS's HTTP
+  wrapper/refinery instead of raw `$_POST`
+- `RevocationRepository::setCutoff()` is now monotonic (never moves an
+  existing cutoff backwards), and `ui_uihk_peg_revoke.revoked_before` is
+  widened from a 32-bit to a 64-bit integer (the previous width would have
+  silently overflowed, and so stopped working, in January 2038)
+- `AuthTokenRepository`'s SSO tokens are now stored as a hash rather than raw,
+  and `consume()` is a single atomic conditional `DELETE`, so two requests
+  racing the same one-time token can no longer both be told it was consumed
+### Removed
+- `testing/external/run.php` and its shared-secret file: a diagnostic meant to
+  be deployed on a separate host to check reachability from outside, which
+  reflected its own shared secret back into its response/log and served
+  publicly-cacheable responses. If you had deployed it separately, delete it
+  there and treat its secret (and its `check.log`) as leaked. The remaining
+  CLI/tab diagnostics already cover `api.php` reachability and the
+  `Authorization` header
+
 ## [7.2.0]
 ### Added
 - Audit logging, integrated with ILIAS's own logging system
