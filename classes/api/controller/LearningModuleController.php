@@ -83,9 +83,13 @@ final class LearningModuleController
             throw ApiException::unauthorized('Invalid token')->withReason('missing_sso_token');
         }
 
-        $status = $this->authTokens->consume($userId, $token);
-        if ($status !== AuthTokenRepository::STATUS_CONSUMED) {
-            $reason = $status === AuthTokenRepository::STATUS_EXPIRED ? 'sso_token_expired' : 'sso_token_unknown';
+        $consumption = $this->authTokens->consume($userId, $token);
+        if (!$consumption->isConsumed()) {
+            $reasons = [
+                AuthTokenRepository::STATUS_EXPIRED => 'sso_token_expired',
+                AuthTokenRepository::STATUS_REVOKED => 'sso_token_revoked',
+            ];
+            $reason = $reasons[$consumption->getStatus()] ?? 'sso_token_unknown';
             throw ApiException::unauthorized('Invalid token')->withReason($reason);
         }
 

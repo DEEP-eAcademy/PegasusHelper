@@ -4,6 +4,7 @@ namespace SRAG\PegasusHelper\api;
 
 use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\container\PegasusHelperContainer;
+use SRAG\PegasusHelper\oauth\MisconfigurationException;
 use SRAG\PegasusHelper\oauth\TokenCodec;
 use SRAG\PegasusHelper\oauth\TokenService;
 use Throwable;
@@ -100,6 +101,11 @@ final class ApiKernel
             self::$auditLog = $auditLog;
             register_shutdown_function([self::class, 'auditRequest']);
 
+            // Deactivating the plugin is meant to be a usable emergency stop
+            // (SEC-09); this must run after the audit log is wired up (so the
+            // rejection itself is audited) and before the request is routed.
+            (new PluginGate())->assertActive();
+
             $router = PegasusHelperContainer::resolve(Router::class);
             $route = $router->match($request->getMethod(), $request->getPath());
             self::$route = $route;
@@ -107,9 +113,11 @@ final class ApiKernel
             if ($route->getAuth() === Router::AUTH_BEARER) {
                 /** @var TokenService $tokenService */
                 $tokenService = PegasusHelperContainer::resolve(TokenService::class);
-                $userId = $tokenService->validateAccess($request->getBearerToken());
-                ApiInitialisation::loadUser($userId);
-                $auditLog->setActor($userId);
+                $grant = $tokenService->validateAccessGrant($request->getBearerToken());
+                ApiInitialisation::loadUser($grant->getUserId());
+                $auditLog->setActor($grant->getUserId());
+                $request = $request->withGrant($grant);
+                self::$request = $request;
             }
 
             $handler = $route->getHandler();
@@ -119,6 +127,13 @@ final class ApiKernel
         } catch (ApiException $e) {
             self::$caughtException = $e;
             self::sendError($e->getStatusCode(), $e->getBody(), $e->getHeaders());
+        } catch (MisconfigurationException $e) {
+            // A missing signing key/API secret is a server-side configuration
+            // fault, not a client error: never expose *why* via status/body
+            // (SEC-01), but still surface a distinct reason in the audit log.
+            self::$caughtException = $e;
+            self::logError($e);
+            self::sendError(500, ['cause' => 'Internal Server Error']);
         } catch (Throwable $e) {
             self::$caughtException = $e;
             self::logError($e);
@@ -145,6 +160,13 @@ final class ApiKernel
         if (self::$caughtException instanceof ApiException) {
             $status = self::$caughtException->getStatusCode();
             $reason = self::$caughtException->getReason();
+        } elseif (self::$caughtException instanceof MisconfigurationException) {
+            $status = 500;
+            $reason = 'misconfigured';
+            // Safe to log: this is always one of the static messages this
+            // plugin's own code writes (e.g. "the token signing salt is not
+            // configured"), never the secret's value itself.
+            $error = self::$caughtException->getMessage();
         } elseif (self::$caughtException instanceof Throwable) {
             $status = 500;
             $error = get_class(self::$caughtException);

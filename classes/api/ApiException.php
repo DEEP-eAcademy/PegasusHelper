@@ -54,6 +54,16 @@ final class ApiException extends Exception
         return new self(400, ['message' => $message]);
     }
 
+    public static function payloadTooLarge(string $cause = 'Payload too large'): self
+    {
+        return new self(413, ['cause' => $cause]);
+    }
+
+    public static function serviceUnavailable(string $cause = 'Service unavailable', int $retryAfterSeconds = 300): self
+    {
+        return new self(503, ['cause' => $cause], ['Retry-After' => (string) $retryAfterSeconds]);
+    }
+
     public static function unauthorized(string $message): self
     {
         return new self(401, ['message' => $message], ['WWW-Authenticate' => 'Bearer']);

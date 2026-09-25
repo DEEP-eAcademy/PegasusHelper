@@ -22,7 +22,11 @@ final class ObjectController
     /**
      * `?recursive=1` walks the whole subtree and runs a per-node checkAccess()
      * call (see ObjectDataMapper::mapRefIds()); cap it so a request against a
-     * huge or near-root subtree can't be used to load the server.
+     * huge or near-root subtree can't be used to load the server. ilTree
+     * exposes no public API to bound the fetch at the data source (no count
+     * or limit parameter on getSubTreeIds()/getChildIds()), so this is
+     * enforced on the result rather than the query -- still bounded, just
+     * after the ids for an oversized subtree have already been fetched once.
      */
     private const MAX_RECURSIVE_NODES = 5000;
 
@@ -55,8 +59,22 @@ final class ObjectController
     {
         global $DIC;
         $refId = (int) $params['refId'];
+        $access = $DIC->access();
+
+        // Without this, an authenticated app user could enumerate the ref ids
+        // (and, via ?recursive=1, the whole subtree shape) of a repository
+        // node they cannot themselves see, before ObjectDataMapper's own
+        // per-node checkAccess() calls ever filter the *contents* (SEC-10).
+        if (!$access->checkAccess('visible', '', $refId)) {
+            throw ApiException::forbidden();
+        }
+
         $tree = $DIC->repositoryTree();
 
+        // ilTree has no public API to cap a subtree fetch at the data source
+        // (see class docblock on MAX_RECURSIVE_NODES); the check below still
+        // rejects an oversized result before it is mapped or returned, which
+        // is the same bound this route has always enforced.
         $refIds = $request->queryBool('recursive') ? $tree->getSubTreeIds($refId) : $tree->getChildIds($refId);
 
         if (count($refIds) > self::MAX_RECURSIVE_NODES) {

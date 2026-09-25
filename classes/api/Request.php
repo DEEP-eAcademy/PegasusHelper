@@ -2,6 +2,8 @@
 
 namespace SRAG\PegasusHelper\api;
 
+use SRAG\PegasusHelper\oauth\Grant;
+
 /**
  * Class Request
  *
@@ -13,6 +15,14 @@ namespace SRAG\PegasusHelper\api;
  */
 final class Request
 {
+    /**
+     * Hard cap on the request body, checked before it is even fully read (see
+     * {@see parseBody()}). Every route this plugin serves needs at most a
+     * handful of short form fields; this is generous headroom over that, not
+     * a limit tuned to any expected payload.
+     */
+    private const MAX_BODY_BYTES = 65536;
+
     /**
      * @var string
      */
@@ -38,13 +48,22 @@ final class Request
      */
     private $bearerToken;
 
-    private function __construct(string $method, string $path, array $query, array $parsedBody, ?string $bearerToken)
+    /**
+     * @var Grant|null set by {@see ApiKernel} once a Bearer token has been
+     *                 validated, so a handler that mints a derived credential
+     *                 (e.g. an SSO auth-token) can inherit the same login
+     *                 identity rather than a bare user id
+     */
+    private $grant;
+
+    private function __construct(string $method, string $path, array $query, array $parsedBody, ?string $bearerToken, ?Grant $grant = null)
     {
         $this->method = $method;
         $this->path = $path;
         $this->query = $query;
         $this->parsedBody = $parsedBody;
         $this->bearerToken = $bearerToken;
+        $this->grant = $grant;
     }
 
     public static function fromGlobals(): self
@@ -56,6 +75,19 @@ final class Request
         $bearerToken = self::resolveBearerToken();
 
         return new self($method, $path, $query, $parsedBody, $bearerToken);
+    }
+
+    /**
+     * @return self a clone carrying the validated Bearer token's grant
+     */
+    public function withGrant(Grant $grant): self
+    {
+        return new self($this->method, $this->path, $this->query, $this->parsedBody, $this->bearerToken, $grant);
+    }
+
+    public function getGrant(): ?Grant
+    {
+        return $this->grant;
     }
 
     private static function resolvePath(): string
@@ -82,18 +114,44 @@ final class Request
         return $path === '' ? '/' : '/' . ltrim($path, '/');
     }
 
+    /**
+     * @throws ApiException 413 if the declared or actual body size exceeds
+     *         {@see MAX_BODY_BYTES} -- checked *before* the body is read in
+     *         full, so an oversized payload can't be used to load the server
+     *         merely by being decoded (SEC-10). This runs before ILIAS itself
+     *         is even booted, so the response is a bare JSON error, exactly
+     *         like every other early rejection in {@see ApiKernel}.
+     */
     private static function parseBody(string $method): array
     {
         if ($method !== 'POST') {
             return [];
         }
 
-        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-        $raw = file_get_contents('php://input');
+        $contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
+        if ($contentLength !== null && ctype_digit((string) $contentLength) && (int) $contentLength > self::MAX_BODY_BYTES) {
+            throw ApiException::payloadTooLarge();
+        }
+
+        // Read via an explicit stream handle rather than file_get_contents()'s
+        // offset/maxlen parameters: php://input is not seekable, and relying
+        // on offset=0 happening to be a no-op is fragile across PHP/SAPI
+        // versions. stream_get_contents()'s $maxLength caps how much is ever
+        // read into memory, independent of (and not trusting) Content-Length.
+        $handle = @fopen('php://input', 'rb');
+        $raw = $handle !== false ? stream_get_contents($handle, self::MAX_BODY_BYTES + 1) : false;
+        if ($handle !== false) {
+            fclose($handle);
+        }
+
         if ($raw === false || $raw === '') {
             return $_POST;
         }
+        if (strlen($raw) > self::MAX_BODY_BYTES) {
+            throw ApiException::payloadTooLarge();
+        }
 
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
         if (stripos($contentType, 'application/json') !== false) {
             $decoded = json_decode($raw, true);
 

@@ -23,10 +23,24 @@ use ZipArchive;
  * root anyway. Zips built here are cached outside `public/` and only ever
  * served through the RBAC-checked `/v1/learning-module/{refId}/zip` route.
  *
+ * A build is (a) serialized per module via an `flock()` on a lock file in the
+ * module's own cache directory, so two concurrent first-time downloads build
+ * once rather than racing each other or the cache-purge step; (b) written to a
+ * temporary file and `rename()`d into place only once complete, so a reader
+ * can never observe (or a purge never removes) a half-written archive; and
+ * (c) bounded by an {@see ArchiveBudget} while repacking, so a maliciously (or
+ * just very badly) sized source archive can't exhaust memory or disk (SEC-10).
+ *
  * @author  Nicolas Schäfli <ns@studer-raimann.ch>
  */
 final class LearningModuleZipBuilder
 {
+    private const MAX_ARCHIVE_ENTRIES = 50000;
+    private const MAX_ENTRY_BYTES = 512 * 1024 * 1024;      // 512 MiB
+    private const MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB
+    private const COMPRESSION_RATIO_CAP = 200;
+    private const RATIO_CHECK_THRESHOLD_BYTES = 10 * 1024 * 1024; // 10 MiB
+
     /**
      * @var ilDBInterface
      */
@@ -69,10 +83,26 @@ final class LearningModuleZipBuilder
     {
         $path = $this->buildCachedZip($objId, $type);
 
+        // Open the file *before* sending any header, and stream from this one
+        // handle to completion: on POSIX, an already-open file descriptor
+        // keeps serving its original inode's content even if a concurrent
+        // cache purge (see purgeOtherZips()) unlinks that path in the
+        // meantime, rather than this request risking a read against a file
+        // that got replaced or removed mid-transfer.
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            throw ApiException::serverError('Could not read learning module archive');
+        }
+        $size = filesize($path);
+
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="lm_' . $objId . '.zip"');
-        header('Content-Length: ' . (string) filesize($path));
-        readfile($path);
+        if ($size !== false) {
+            header('Content-Length: ' . (string) $size);
+        }
+
+        fpassthru($handle);
+        fclose($handle);
         exit;
     }
 
@@ -126,37 +156,85 @@ final class LearningModuleZipBuilder
             return $target;
         }
 
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0755, true) && !is_dir($cacheDir)) {
+        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0750, true) && !is_dir($cacheDir)) {
             throw ApiException::serverError('Could not prepare learning module archive');
         }
-        $this->purgeOtherZips($cacheDir, $target);
 
-        $zip = new ZipArchive();
-        if ($zip->open($target, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw ApiException::serverError('Could not create learning module archive');
+        // Serialize every build for this module through one lock file, so two
+        // concurrent first-time downloads (or a download racing a purge)
+        // build exactly once rather than corrupting/duplicating work.
+        $lockHandle = fopen($cacheDir . '/.lock', 'c');
+        if ($lockHandle === false || !flock($lockHandle, LOCK_EX)) {
+            throw ApiException::serverError('Could not prepare learning module archive');
         }
 
-        if ($type === 'htlm') {
-            $rid = $this->fileBasedLmResourceId($objId);
-            if ($rid !== null && $rid !== '' && $rid !== '-') {
-                $this->addIrssContainerEntries($zip, $rid, $meta['zipDirName']);
-            } else {
-                $this->addDirectoryEntries($zip, $this->legacyDir($objId), $meta['zipDirName']);
+        try {
+            // Re-check now that the lock is held: another request may have
+            // just finished building it while this one was waiting.
+            if (is_file($target)) {
+                return $target;
             }
-        } else {
-            $this->addDirectoryEntries($zip, $this->legacyDir($objId), $meta['zipDirName']);
+
+            $this->purgeOtherZips($cacheDir, $target);
+
+            $tmpPath = $cacheDir . '/.tmp-' . bin2hex(random_bytes(8)) . '.zip';
+            $zip = new ZipArchive();
+            if ($zip->open($tmpPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw ApiException::serverError('Could not create learning module archive');
+            }
+
+            try {
+                $budget = new ArchiveBudget(
+                    self::MAX_ARCHIVE_ENTRIES,
+                    self::MAX_ENTRY_BYTES,
+                    self::MAX_TOTAL_BYTES,
+                    self::COMPRESSION_RATIO_CAP,
+                    self::RATIO_CHECK_THRESHOLD_BYTES
+                );
+
+                if ($type === 'htlm') {
+                    $rid = $this->fileBasedLmResourceId($objId);
+                    if ($rid !== null && $rid !== '' && $rid !== '-') {
+                        $this->addIrssContainerEntries($zip, $rid, $meta['zipDirName'], $budget);
+                    } else {
+                        $this->addDirectoryEntries($zip, $this->legacyDir($objId), $meta['zipDirName'], $budget);
+                    }
+                } else {
+                    $this->addDirectoryEntries($zip, $this->legacyDir($objId), $meta['zipDirName'], $budget);
+                }
+            } catch (ApiException $e) {
+                $zip->close();
+                @unlink($tmpPath);
+
+                throw $e;
+            }
+
+            if (!$zip->close()) {
+                @unlink($tmpPath);
+
+                throw ApiException::serverError('Could not finalize learning module archive');
+            }
+
+            chmod($tmpPath, 0640);
+
+            if (!rename($tmpPath, $target)) {
+                @unlink($tmpPath);
+
+                throw ApiException::serverError('Could not finalize learning module archive');
+            }
+
+            return $target;
+        } finally {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
         }
-
-        $zip->close();
-
-        return $target;
     }
 
     /**
      * Repacks the container's raw zip (read directly off disk via the IRSS stream
      * metadata) under the `$zipDirName/` prefix the app requires.
      */
-    private function addIrssContainerEntries(ZipArchive $zip, string $rid, string $zipDirName): void
+    private function addIrssContainerEntries(ZipArchive $zip, string $rid, string $zipDirName, ArchiveBudget $budget): void
     {
         global $DIC;
         $uri = $DIC->resourceStorage()->consume()->stream($rid)->getStream()->getMetadata('uri');
@@ -169,18 +247,34 @@ final class LearningModuleZipBuilder
             throw ApiException::serverError('Learning module archive could not be read');
         }
 
-        for ($i = 0; $i < $source->numFiles; $i++) {
-            $name = $source->getNameIndex($i);
-            if ($name === false || substr($name, -1) === '/') {
-                continue;
+        try {
+            for ($i = 0; $i < $source->numFiles; $i++) {
+                $name = $source->getNameIndex($i);
+                if ($name === false || substr($name, -1) === '/') {
+                    continue;
+                }
+                if (!self::isSafeEntryName($name)) {
+                    continue;
+                }
+
+                $stat = $source->statIndex($i);
+                $uncompressed = $stat !== false ? (int) $stat['size'] : 0;
+                $compressed = $stat !== false ? (int) $stat['comp_size'] : 0;
+                // Checked -- and may throw -- before the entry is ever
+                // decompressed into memory below (SEC-10).
+                $budget->account($uncompressed, $compressed);
+
+                $contents = $source->getFromIndex($i);
+                if ($contents === false) {
+                    continue;
+                }
+                if (!$zip->addFromString($zipDirName . '/' . $name, $contents)) {
+                    throw ApiException::serverError('Could not add an entry to the learning module archive');
+                }
             }
-            $contents = $source->getFromIndex($i);
-            if ($contents === false) {
-                continue;
-            }
-            $zip->addFromString($zipDirName . '/' . $name, $contents);
+        } finally {
+            $source->close();
         }
-        $source->close();
     }
 
     /**
@@ -188,10 +282,14 @@ final class LearningModuleZipBuilder
      * skipping nested `.zip` files (matches the REST plugin's own exclusion, which
      * avoided re-shipping a SCORM package's internal backup zip of itself).
      */
-    private function addDirectoryEntries(ZipArchive $zip, string $sourceDir, string $zipDirName): void
+    private function addDirectoryEntries(ZipArchive $zip, string $sourceDir, string $zipDirName, ArchiveBudget $budget): void
     {
         $sourceDir = rtrim($sourceDir, '/');
         if (!is_dir($sourceDir)) {
+            throw ApiException::serverError('Learning module content is unavailable');
+        }
+        $realSourceDir = realpath($sourceDir);
+        if ($realSourceDir === false) {
             throw ApiException::serverError('Learning module content is unavailable');
         }
 
@@ -200,12 +298,61 @@ final class LearningModuleZipBuilder
         );
         foreach ($iterator as $file) {
             /** @var \SplFileInfo $file */
+            if ($file->isLink()) {
+                // Never follow a symlinked file out of (or within) the source
+                // tree; a symlinked *directory* is already not descended into
+                // by RecursiveDirectoryIterator without FOLLOW_SYMLINKS.
+                continue;
+            }
             if (!$file->isFile() || strtolower($file->getExtension()) === 'zip') {
                 continue;
             }
+
+            $realPath = realpath($file->getPathname());
+            if ($realPath === false || strpos($realPath, $realSourceDir . DIRECTORY_SEPARATOR) !== 0) {
+                continue;
+            }
+
             $relative = ltrim(substr($file->getPathname(), strlen($sourceDir)), '/');
-            $zip->addFile($file->getPathname(), $zipDirName . '/' . $relative);
+            if (!self::isSafeEntryName($relative)) {
+                continue;
+            }
+
+            $size = (int) $file->getSize();
+            // A plain filesystem file has no separate compressed size; pass
+            // the same value twice so the ratio check is always a no-op here.
+            $budget->account($size, $size);
+
+            if (!$zip->addFile($file->getPathname(), $zipDirName . '/' . $relative)) {
+                throw ApiException::serverError('Could not add an entry to the learning module archive');
+            }
         }
+    }
+
+    /**
+     * @param string $name a zip entry name, or a path relative to a source directory
+     * @return bool false if the name could escape the `$zipDirName/` prefix it
+     *              is about to be added under, or contains characters no
+     *              legitimate learning-module asset needs
+     */
+    private static function isSafeEntryName(string $name): bool
+    {
+        if ($name === '' || strpos($name, "\0") !== false || strpos($name, '\\') !== false) {
+            return false;
+        }
+        if ($name[0] === '/') {
+            return false;
+        }
+        if (preg_match('/^[A-Za-z]:/', $name) === 1) {
+            return false;
+        }
+        foreach (explode('/', $name) as $segment) {
+            if ($segment === '..') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function maxMtime(string $path): int
@@ -224,6 +371,9 @@ final class LearningModuleZipBuilder
         );
         foreach ($iterator as $entry) {
             /** @var \SplFileInfo $entry */
+            if ($entry->isLink()) {
+                continue;
+            }
             $mtime = (int) $entry->getMTime();
             if ($mtime > $max) {
                 $max = $mtime;
