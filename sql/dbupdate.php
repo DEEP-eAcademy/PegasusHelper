@@ -307,3 +307,177 @@ if ($ilDB->tableExists('log_components')) {
 global $ilLog;
 $ilLog->write('Plugin PegasusHelper -> DB-Update #18: Seeded log_components row for the audit log channel.');
 ?>
+<#19>
+<?php
+// Repairs a missing or empty signing salt, API key or API secret. Since
+// 7.3.0, SRAG\PegasusHelper\oauth\ApiSettings::requireSalt()/requireApiKey()/
+// requireApiSecret() make the plugin fail closed rather than validate tokens
+// against an empty key (SEC-01) -- an install that somehow ended up with one
+// of these empty (e.g. a manual DB edit, or an old bug) would otherwise be
+// locked out of login/refresh entirely after this update. A non-empty value
+// already set by steps #15/#16 (or an admin, via the General tab) is left
+// untouched; regenerating any of these has the same effect as an admin
+// rotating them via the General tab -- every previously issued token stops
+// working and a fresh login is required.
+global $ilDB;
+
+$settings = new SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
+
+if ($settings->getSalt() === '') {
+    $settings->set(SRAG\PegasusHelper\oauth\ApiSettings::KEY_SALT, bin2hex(random_bytes(32)));
+}
+if ($settings->getApiKey() === '') {
+    $settings->set(SRAG\PegasusHelper\oauth\ApiSettings::KEY_API_KEY, 'ilias_pegasus');
+}
+if ($settings->getApiSecret() === '') {
+    $alphabet = '123456789abcdefghijklmnopqrstuvwxyz';
+    $chunk = static function (int $length) use ($alphabet): string {
+        $result = '';
+        for ($i = 0; $i < $length; $i++) {
+            $result .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        return $result;
+    };
+    $settings->set(SRAG\PegasusHelper\oauth\ApiSettings::KEY_API_SECRET, $chunk(4) . '.' . $chunk(4) . '-' . $chunk(2));
+}
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #19: Repaired any missing/empty OAuth signing salt, API key or API secret.');
+?>
+<#20>
+<?php
+// Refresh-token rotation, login-family tracking and replay detection
+// (SEC-03/SEC-06) -- see SRAG\PegasusHelper\oauth\RefreshTokenRepository,
+// GrantFamilyRepository and TokenService::refresh(). The three new columns on
+// ui_uihk_peg_refresh are nullable/defaulted, so a row minted by pre-7.3.0
+// code is simply treated as "no family yet" and adopted into a fresh one the
+// next time it is used to refresh (see TokenService::adoptLegacyFamily()).
+global $ilDB;
+
+if (!$ilDB->tableColumnExists('ui_uihk_peg_refresh', 'family_id')) {
+    $ilDB->addTableColumn('ui_uihk_peg_refresh', 'family_id', [
+        'type' => 'text',
+        'length' => 32,
+        'notnull' => false,
+    ]);
+}
+if (!$ilDB->tableColumnExists('ui_uihk_peg_refresh', 'expires')) {
+    $ilDB->addTableColumn('ui_uihk_peg_refresh', 'expires', [
+        'type' => 'integer',
+        'length' => 8,
+        'notnull' => true,
+        'default' => 0,
+    ]);
+}
+if (!$ilDB->tableColumnExists('ui_uihk_peg_refresh', 'rotated_at')) {
+    $ilDB->addTableColumn('ui_uihk_peg_refresh', 'rotated_at', [
+        'type' => 'integer',
+        'length' => 8,
+        'notnull' => true,
+        'default' => 0,
+    ]);
+}
+if (!$ilDB->indexExistsByFields('ui_uihk_peg_refresh', ['family_id'])) {
+    $ilDB->addIndex('ui_uihk_peg_refresh', ['family_id'], 'i2');
+}
+if (!$ilDB->indexExistsByFields('ui_uihk_peg_refresh', ['expires'])) {
+    $ilDB->addIndex('ui_uihk_peg_refresh', ['expires'], 'i3');
+}
+if (!$ilDB->indexExistsByFields('ui_uihk_peg_refresh', ['user_id'])) {
+    $ilDB->addIndex('ui_uihk_peg_refresh', ['user_id'], 'i4');
+}
+
+if (!$ilDB->tableExists('ui_uihk_peg_family')) {
+    $fields = [
+        'family_id' => [
+            'type' => 'text',
+            'length' => 32,
+            'fixed' => true,
+            'notnull' => true,
+        ],
+        'user_id' => [
+            'type' => 'integer',
+            'length' => 4,
+            'notnull' => true,
+        ],
+        'auth_time' => [
+            'type' => 'integer',
+            'length' => 8,
+            'notnull' => true,
+        ],
+        'created' => [
+            'type' => 'integer',
+            'length' => 8,
+            'notnull' => true,
+        ],
+        'last_used' => [
+            'type' => 'integer',
+            'length' => 8,
+            'notnull' => true,
+        ],
+        'revoked' => [
+            'type' => 'integer',
+            'length' => 1,
+            'notnull' => true,
+            'default' => 0,
+        ],
+    ];
+    $ilDB->createTable('ui_uihk_peg_family', $fields);
+    $ilDB->addPrimaryKey('ui_uihk_peg_family', ['family_id']);
+    $ilDB->addIndex('ui_uihk_peg_family', ['user_id'], 'i1');
+}
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #20: Added refresh-token rotation columns and created ui_uihk_peg_family.');
+?>
+<#21>
+<?php
+// SSO auth-tokens now carry the login (grant) they were minted from, so a
+// redeemed token can be rejected if its login was revoked after issuance but
+// before redemption (SEC-02), and the token itself is stored only as a hash,
+// never raw (SEC-05) -- see SRAG\PegasusHelper\authentication\AuthTokenRepository.
+// Existing rows predate both changes and live at most 60 seconds in the first
+// place, so they are simply cleared rather than migrated.
+global $ilDB;
+
+if (!$ilDB->tableColumnExists('ui_uihk_peg_token', 'auth_time')) {
+    $ilDB->addTableColumn('ui_uihk_peg_token', 'auth_time', [
+        'type' => 'integer',
+        'length' => 8,
+        'notnull' => true,
+        'default' => 0,
+    ]);
+}
+if (!$ilDB->tableColumnExists('ui_uihk_peg_token', 'family_id')) {
+    $ilDB->addTableColumn('ui_uihk_peg_token', 'family_id', [
+        'type' => 'text',
+        'length' => 32,
+        'notnull' => false,
+    ]);
+}
+if (!$ilDB->indexExistsByFields('ui_uihk_peg_token', ['expires'])) {
+    $ilDB->addIndex('ui_uihk_peg_token', ['expires'], 'i2');
+}
+
+$ilDB->manipulate('DELETE FROM ui_uihk_peg_token');
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #21: Added grant columns to ui_uihk_peg_token; cleared outstanding pre-7.3.0 SSO tokens (max 60s old).');
+?>
+<#22>
+<?php
+// Widens revoked_before from a 32-bit to a 64-bit integer: the previous width
+// would silently overflow (wrapping into the past, making the cutoff
+// ineffective) in January 2038.
+global $ilDB;
+
+$ilDB->modifyTableColumn('ui_uihk_peg_revoke', 'revoked_before', [
+    'type' => 'integer',
+    'length' => 8,
+    'notnull' => true,
+]);
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #22: Widened ui_uihk_peg_revoke.revoked_before to a 64-bit integer.');
+?>

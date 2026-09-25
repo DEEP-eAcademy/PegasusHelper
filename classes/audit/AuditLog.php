@@ -51,15 +51,17 @@ final class AuditLog
     public const EVENT_API_REQUEST = 'api.request';
     public const EVENT_APP_LOGIN = 'auth.app_login';
     public const EVENT_TOKEN_REFRESH = 'auth.token_refresh';
+    public const EVENT_TOKEN_REPLAY = 'auth.token_replay';
     public const EVENT_SSO_LOGIN = 'auth.sso_login';
     public const EVENT_SSO_LOGIN_FAILED = 'auth.sso_login_failed';
+    public const EVENT_SESSION_TERMINATED = 'auth.session_terminated';
     public const EVENT_FILE_DOWNLOAD = 'content.file_download';
     public const EVENT_LM_DOWNLOAD = 'content.lm_download';
     public const EVENT_ADMIN_API_SETTINGS_CHANGED = 'admin.api_settings_changed';
     public const EVENT_ADMIN_TOKENS_REVOKED = 'admin.tokens_revoked';
     public const EVENT_ADMIN_SALT_ROTATED = 'admin.signing_salt_rotated';
     public const EVENT_ADMIN_THEME_CHANGED = 'admin.theme_changed';
-    public const EVENT_ADMIN_EXTERNAL_TESTS_RUN = 'admin.external_tests_run';
+    public const EVENT_ADMIN_REQUEST_REJECTED = 'admin.request_rejected';
 
     /**
      * Field names stripped from every logged entry, regardless of where they

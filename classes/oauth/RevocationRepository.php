@@ -11,9 +11,11 @@ use ilDBInterface;
  * which is exactly what makes them impossible to kill individually. This
  * repository gives an admin a way to invalidate every token already issued --
  * to one user, or to everyone -- without touching the signing salt: it records
- * a "revoked before" cutoff in `ui_uihk_pegasus_revocation`, checked against a
- * token's issued-at time (see {@see TokenCodec::issuedAt()}) on every request.
- * The global cutoff is stored under the reserved user id 0.
+ * a "revoked before" cutoff in `ui_uihk_peg_revoke`, checked against a grant's
+ * *authTime* (see {@see \SRAG\PegasusHelper\oauth\Grant}, {@see GrantGuard})
+ * rather than a token's own issued-at time, so a refreshed successor of a
+ * grant that predates the cutoff is also caught. The global cutoff is stored
+ * under the reserved user id 0.
  *
  * A token minted before this feature existed (from the REST plugin, or from an
  * older PegasusHelper) has no issued-at time and is treated as issued at time
@@ -101,12 +103,40 @@ final class RevocationRepository
         return $row !== null ? (int) $row['revoked_before'] : 0;
     }
 
+    /**
+     * Monotonic: never moves an existing cutoff backwards. Without this, two
+     * concurrent revocations (e.g. an admin's "Revoke" click racing a salt
+     * rotation's own "revoke all") could have the later-committing call with
+     * the *earlier* timestamp silently win via a plain upsert, undoing part of
+     * the other revocation.
+     */
     private function setCutoff(int $userId, int $cutoff): void
     {
-        $this->db->replace(
-            self::TABLE,
-            ['user_id' => ['integer', $userId]],
-            ['revoked_before' => ['integer', $cutoff]]
+        $updated = $this->db->manipulateF(
+            'UPDATE ' . self::TABLE . ' SET revoked_before = %s WHERE user_id = %s AND revoked_before < %s',
+            ['integer', 'integer', 'integer'],
+            [$cutoff, $userId, $cutoff]
         );
+        if ($updated > 0) {
+            return;
+        }
+
+        try {
+            $this->db->manipulateF(
+                'INSERT INTO ' . self::TABLE . ' (user_id, revoked_before) VALUES (%s, %s)',
+                ['integer', 'integer'],
+                [$userId, $cutoff]
+            );
+        } catch (\Throwable $e) {
+            // A concurrent setCutoff() call for the same user won the race to
+            // insert the row first (or the existing cutoff is already >= this
+            // one, and the UPDATE above legitimately affected 0 rows); re-apply
+            // the monotonic UPDATE against whatever is there now.
+            $this->db->manipulateF(
+                'UPDATE ' . self::TABLE . ' SET revoked_before = %s WHERE user_id = %s AND revoked_before < %s',
+                ['integer', 'integer', 'integer'],
+                [$cutoff, $userId, $cutoff]
+            );
+        }
     }
 }

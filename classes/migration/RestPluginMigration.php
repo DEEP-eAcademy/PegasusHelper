@@ -48,9 +48,18 @@ final class RestPluginMigration
         $client = $this->fetchRestClient();
 
         if ($client !== null) {
+            $legacySecret = (string) $client['api_secret'];
+            $legacySalt = $this->fetchRestConfig('salt');
+
             $settings->set(ApiSettings::KEY_API_KEY, self::REST_API_KEY);
-            $settings->set(ApiSettings::KEY_API_SECRET, (string) $client['api_secret']);
-            $settings->set(ApiSettings::KEY_SALT, $this->fetchRestConfig('salt') ?? bin2hex(random_bytes(32)));
+            // An explicitly *empty* legacy secret/salt is just as unusable as a
+            // missing one -- generate a fresh value rather than migrating an
+            // empty string that would let every signature check pass, or let
+            // `hash_equals('', '')` accept a refresh request with no secret at
+            // all (SEC-01). '??' alone would not catch this: it only replaces
+            // null, not ''.
+            $settings->set(ApiSettings::KEY_API_SECRET, $legacySecret !== '' ? $legacySecret : $this->generateSecret());
+            $settings->set(ApiSettings::KEY_SALT, ($legacySalt !== null && $legacySalt !== '') ? $legacySalt : bin2hex(random_bytes(32)));
             $settings->set(ApiSettings::KEY_ACCESS_TOKEN_TTL, $this->fetchRestConfig('access_token_ttl') ?? self::DEFAULT_ACCESS_TOKEN_TTL);
             $settings->set(ApiSettings::KEY_REFRESH_TOKEN_TTL, $this->fetchRestConfig('refresh_token_ttl') ?? self::DEFAULT_REFRESH_TOKEN_TTL);
 

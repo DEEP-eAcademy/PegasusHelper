@@ -17,6 +17,8 @@ use SRAG\PegasusHelper\api\Router;
 use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\authentication\AuthTokenRepository;
 use SRAG\PegasusHelper\oauth\ApiSettings;
+use SRAG\PegasusHelper\oauth\GrantFamilyRepository;
+use SRAG\PegasusHelper\oauth\GrantGuard;
 use SRAG\PegasusHelper\oauth\RefreshTokenRepository;
 use SRAG\PegasusHelper\oauth\RevocationRepository;
 use SRAG\PegasusHelper\oauth\TokenCodec;
@@ -46,7 +48,10 @@ final class ApiProvider implements ServiceProviderInterface
         });
 
         $pimple[TokenCodec::class] = $pimple->factory(function ($c) {
-            return new TokenCodec($c[ApiSettings::class]->getSalt());
+            // requireSalt() (rather than getSalt()) is what makes an empty or
+            // missing signing salt fail closed instead of validating tokens
+            // against a publicly-known empty key (SEC-01).
+            return new TokenCodec($c[ApiSettings::class]->requireSalt());
         });
 
         $pimple[RefreshTokenRepository::class] = $pimple->factory(function ($c) {
@@ -61,12 +66,25 @@ final class ApiProvider implements ServiceProviderInterface
             return new RevocationRepository($DIC->database());
         });
 
+        $pimple[GrantFamilyRepository::class] = $pimple->factory(function ($c) {
+            global $DIC;
+
+            return new GrantFamilyRepository($DIC->database());
+        });
+
+        $pimple[GrantGuard::class] = $pimple->factory(function ($c) {
+            return new GrantGuard($c[RevocationRepository::class], $c[GrantFamilyRepository::class], $c[ApiSettings::class]);
+        });
+
         $pimple[TokenService::class] = $pimple->factory(function ($c) {
             return new TokenService(
                 $c[TokenCodec::class],
                 $c[ApiSettings::class],
                 $c[RefreshTokenRepository::class],
+                $c[GrantFamilyRepository::class],
                 $c[RevocationRepository::class],
+                $c[GrantGuard::class],
+                $c[AuthTokenRepository::class],
                 $c[AuditLog::class]
             );
         });
