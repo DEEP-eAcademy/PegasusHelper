@@ -1,6 +1,5 @@
 # The testing/ tree is a CLI diagnostic tool and must never be served over
-# HTTP: it can write diagnostic logs containing configuration details, and
-# testing/external/run.php makes outbound requests to a caller-supplied host.
+# HTTP: it can write diagnostic logs containing configuration details.
 # See testing/HELP.md and the README for the nginx equivalent of this block
 # (nginx does not read .htaccess files).
 <IfModule mod_authz_core.c>

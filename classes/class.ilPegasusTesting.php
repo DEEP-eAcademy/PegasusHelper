@@ -13,9 +13,10 @@ final class ilPegasusHelperTesting
     }
 
     /**
-     * @param $suiteName string set to "internal" or "external"
+     * Runs the plugin's internal self-test suite (no outbound network calls
+     * other than to this same ILIAS installation's own api.php).
      */
-    public function run($suiteName)
+    public function run()
     {
         $set_global_ilias = !isset($GLOBALS["ilias"]);
         if ($set_global_ilias) {
@@ -24,15 +25,7 @@ final class ilPegasusHelperTesting
 
         $info = getInfo();
         $targetInfo = getTargetInfo($info);
-        switch ($suiteName) {
-            default:
-            case "internal":
-                $suite = getInternalTestSuite(TestingContext::C_ILIAS);
-                break;
-            case "external":
-                $suite = getExternalTestsSuite(TestingContext::C_ILIAS);
-                break;
-        }
+        $suite = getInternalTestSuite(TestingContext::C_ILIAS);
         $suite->run($info, $targetInfo);
 
         if ($set_global_ilias) {

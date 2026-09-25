@@ -14,9 +14,14 @@ txt_access_token_ttl#:#Gültigkeitsdauer Access-Token (Minuten)
 txt_info_access_token_ttl#:#Wie lange ein App-Login gültig bleibt, bevor er erneuert werden muss. Ein geleaktes Access-Token bleibt so lange nutzbar.
 txt_refresh_token_ttl#:#Gültigkeitsdauer Refresh-Token (Minuten)
 txt_info_refresh_token_ttl#:#Wie lange die App eingeloggt bleiben kann, ohne dass die Zugangsdaten erneut eingegeben werden müssen.
+txt_max_login_age_days#:#Maximales Login-Alter (Tage)
+txt_info_max_login_age_days#:#Zwingt die App zu einer erneuten Anmeldung, sobald der ursprüngliche Login so viele Tage alt ist, auch wenn er laufend erneuert wird. 0 bedeutet unbegrenzt.
+txt_weak_salt_warning#:#Das Signatur-Salt ist kürzer als empfohlen. Es sollte unten rotiert werden.
 form_revoke_user#:#Tokens eines Benutzers widerrufen
 txt_username#:#ILIAS-Benutzername
 txt_info_revoke_user#:#Widerruft alle bereits ausgestellten Access- und Refresh-Tokens dieses Benutzers. Er muss sich danach erneut anmelden. Ein danach gestarteter Login ist nicht betroffen.
+txt_terminate_sessions#:#Auch die ILIAS-Websitzungen dieses Benutzers beenden
+txt_info_terminate_sessions#:#Beendet jede bereits laufende Browser-Sitzung dieses Benutzers, nicht nur App-Tokens.
 button_revoke#:#Widerrufen
 msg_revoke_user_done#:#Alle Tokens dieses Benutzers wurden widerrufen
 msg_revoke_user_not_found#:#Es wurde kein ILIAS-Benutzer mit diesem Namen gefunden
@@ -55,8 +60,6 @@ tests_txt_warning_info#:#Je nach Konfiguration kann eine Warnung auf ein Problem
 tests_txt_aborted#:#Der Test konnte nicht durchgeführt werden
 tests_txt_name#:#Titel
 tests_txt_tests#:#Tests
-tests_txt_external_tests#:#Externe Tests
-tests_txt_run_external_tests#:#Externe Tests durchführen
 msg_coloring_not_saved#:#Die Farbwahl konnte nicht gespeichert werden. Die Grundfarbe muss als 6-stellige hex-Zahl eingegeben werden
 msg_coloring_saved#:#Die Farbwahl wurde gespeichert
 msg_coloring_reset#:#Die Farbwahl wurde zurückgesetzt
@@ -77,3 +80,5 @@ txt_audit_state_warning#:#Nur verdächtige/fehlgeschlagene Ereignisse und höher
 txt_audit_state_error#:#Nur Serverfehler
 txt_audit_log_file#:#Log-Datei
 txt_audit_cache_warning#:#Für diese Installation ist Log-Caching aktiviert. Einträge unterhalb der Cache-Stufe können stillschweigend verworfen werden, auch wenn dieser Kanal sie eigentlich protokollieren würde.
+msg_method_not_allowed#:#Diese Aktion muss über ein Formular ausgelöst werden, nicht über einen direkten Link.
+msg_permission_denied#:#Sie haben keine Berechtigung, diese Aktion durchzuführen.

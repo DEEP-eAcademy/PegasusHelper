@@ -14,9 +14,14 @@ txt_access_token_ttl#:#Access token lifetime (minutes)
 txt_info_access_token_ttl#:#How long an app login stays valid before it must refresh. A leaked access token remains usable for this long.
 txt_refresh_token_ttl#:#Refresh token lifetime (minutes)
 txt_info_refresh_token_ttl#:#How long the app can stay logged in without the user re-entering credentials.
+txt_max_login_age_days#:#Maximum login age (days)
+txt_info_max_login_age_days#:#Forces the app to log in again once its original login is this many days old, even if it keeps refreshing. 0 means unlimited.
+txt_weak_salt_warning#:#The signing salt is shorter than recommended. Consider rotating it below.
 form_revoke_user#:#Revoke Tokens for a User
 txt_username#:#ILIAS Username
 txt_info_revoke_user#:#Invalidates every access and refresh token already issued to this user's app installation(s). They will need to log in again. Does not affect a login started after this action.
+txt_terminate_sessions#:#Also terminate this user's ILIAS web sessions
+txt_info_terminate_sessions#:#Ends any browser session already logged in as this user, not just app tokens.
 button_revoke#:#Revoke
 msg_revoke_user_done#:#All tokens for this user have been revoked
 msg_revoke_user_not_found#:#No such ILIAS user was found
@@ -55,8 +60,6 @@ tests_txt_warning_info#:#depending on the setup of ILIAS, a test resulting in a 
 tests_txt_aborted#:#it was not possible to run the test
 tests_txt_name#:#Name
 tests_txt_tests#:#Tests
-tests_txt_external_tests#:#External Tests
-tests_txt_run_external_tests#:#Run external tests
 msg_coloring_not_saved#:#App coloring was not saved. The input for the primary color must be a 6-digit hex-color
 msg_coloring_saved#:#App coloring saved successfully
 msg_coloring_reset#:#App coloring reset successfully
@@ -77,3 +80,5 @@ txt_audit_state_warning#:#Suspicious/failed events and above only
 txt_audit_state_error#:#Server errors only
 txt_audit_log_file#:#Log File
 txt_audit_cache_warning#:#ILIAS log caching is enabled for this installation. Entries below the cache's own level may be silently discarded even though this channel is configured to write them.
+msg_method_not_allowed#:#This action must be submitted as a form, not opened as a link.
+msg_permission_denied#:#You do not have permission to perform this action.

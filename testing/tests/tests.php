@@ -60,32 +60,6 @@ function getInternalTestSuite($context)
     return $suite;
 }
 
-/**
- * creates a collection of tests with HTTP requests
- *
- * @param $context int for TestingContext
- * @return TestSuite
- */
-function getExternalTestsSuite($context)
-{
-    $suite = new TestSuite("External Testing", $context);
-
-    $pegasusHelper = new TestCategory("Accessing Resources");
-    $pegasusHelper->addTests([
-        new Test("external URL", "testExternalUrl", false),
-        new Test("PegasusHelper API reachable", "testApiConnection", false)
-    ]);
-    $suite->addCategories($pegasusHelper);
-
-    $pegasusHelper = new TestCategory("External Script");
-    $pegasusHelper->addTests([
-        new Test("successful run", "testExternalTestScriptComplete", false)
-    ]);
-    $suite->addCategories($pegasusHelper);
-
-    return $suite;
-}
-
 // 0 General
 
 function testWorkingDirectory($info, $targetInfo, $suite)
@@ -266,43 +240,6 @@ function testRestPluginNotActive($info, $targetInfo, $suite)
     return completeTestResult($pass, $msg);
 }
 
-// 4 External
-
-function testExternalUrl($info, $targetInfo, $suite)
-{
-    if (!$info["Connectivity"]["external_url"]["response"]["status"]) {
-        return failTestFromMissingInfo();
-    }
-    list($pass, $msg) = testHttpResponseStatus($info["Connectivity"]["external_url"]["response"]["status"]);
-    return completeTestResult($pass, $msg);
-}
-
-function testApiConnection($info, $targetInfo, $suite)
-{
-    if (!isset($info["Connectivity"]["api_no_token"]["response"]["status"])) {
-        return failTestFromMissingInfo();
-    }
-    // An unauthenticated request is expected to be rejected with 401, which
-    // proves the request reached api.php and was routed correctly.
-    $status = $info["Connectivity"]["api_no_token"]["response"]["status"];
-    $pass = $status === 401;
-    $msg = $pass ? "" : "expected HTTP 401 (missing token), received status $status";
-    return completeTestResult($pass, $msg);
-}
-
-function testExternalTestScriptComplete($info, $targetInfo, $suite)
-{
-    if (!$info["Connectivity"]["external_testing"]) {
-        return failTestFromMissingInfo();
-    }
-    // run.php's own (curl-based) httpLoggedRequest() puts the real target status
-    // under body.info.http_code (curl_getinfo), not body.response.
-    $status = $info["Connectivity"]["external_testing"]["response"]["body"]["info"]["http_code"] ?? null;
-    $pass = $status === 401;
-    $msg = $pass ? "" : "expected the external script to receive HTTP 401 from api.php, got " . var_export($status, true);
-    return completeTestResult($pass, $msg);
-}
-
 // * Multiple
 
 /**
@@ -352,9 +289,3 @@ function testPluginActive($plugin_info)
     return [$pass, $msg];
 }
 
-function testHttpResponseStatus($status)
-{
-    $pass = $status == 200;
-    $msg = $pass ? "" : "received status $status";
-    return [$pass, $msg];
-}

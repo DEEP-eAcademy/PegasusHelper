@@ -16,14 +16,6 @@ initPegasusHelperCLI();
 printNormal("Diagnostics for the PegasusHelper plugin\n");
 printNormal("=========================================\n");
 
-printNormal("do you want to run external tests [y/n]? ");
-$handle = fopen("php://stdin", "r");
-$line = fgets($handle);
-addToLog($line);
-$line = trim($line);
-$external = strlen($line) ? $line[0] === "y" : false;
-printNormal("will " . ($external ? "" : "not ") . "run external tests\n");
-
 // collect info
 
 printNormal("\n> Gathering information for tests...\n");
@@ -38,12 +30,6 @@ printNormal("\n> Running tests...\n");
 $suite = getInternalTestSuite(TestingContext::C_CLI);
 $suite->run($info, $targetInfo);
 printResults($suite);
-
-if ($external) {
-    $suite = getExternalTestsSuite(TestingContext::C_CLI);
-    $suite->run($info, $targetInfo);
-    printResults($suite);
-}
 
 // write log
 
