@@ -276,3 +276,34 @@ $ilDB->addPrimaryKey('ui_uihk_peg_revoke', array('user_id'));
 global $ilLog;
 $ilLog->write('Plugin PegasusHelper -> DB-Update #17: Created ui_uihk_peg_revoke.');
 ?>
+<#18>
+<?php
+// Seeds a `log_components` row for this plugin's own audit-log channel
+// (SRAG\PegasusHelper\audit\AuditLog::CHANNEL, "sragpegasushelper") at level
+// 200 (ilLogLevel::INFO), so audit entries are written even on installs whose
+// global log level default is higher. An admin can still raise or lower this
+// afterwards from Administration > System Settings and Maintenance > Logging
+// (it is listed there as "Unknown (sragpegasushelper)", since ILIAS's
+// component repository doesn't know plugin ids) -- inserted only if the row
+// doesn't already exist, so that later choice is never overwritten by a
+// re-run of this step.
+global $ilDB;
+
+if ($ilDB->tableExists('log_components')) {
+    $set = $ilDB->queryF(
+        'SELECT component_id FROM log_components WHERE component_id = %s',
+        array('text'),
+        array('sragpegasushelper')
+    );
+    if ($ilDB->fetchAssoc($set) === null) {
+        $ilDB->manipulateF(
+            'INSERT INTO log_components (component_id, log_level) VALUES (%s, %s)',
+            array('text', 'integer'),
+            array('sragpegasushelper', 200)
+        );
+    }
+}
+
+global $ilLog;
+$ilLog->write('Plugin PegasusHelper -> DB-Update #18: Seeded log_components row for the audit log channel.');
+?>

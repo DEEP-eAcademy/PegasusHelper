@@ -2,8 +2,10 @@
 
 namespace SRAG\PegasusHelper\handler\OAuthManager\v52;
 
+use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\handler\BaseHandler;
 use SRAG\PegasusHelper\handler\ChainRequestHandler;
+use SRAG\PegasusHelper\oauth\TokenCodec;
 use SRAG\PegasusHelper\oauth\TokenService;
 
 /**
@@ -26,9 +28,15 @@ final class OauthManagerImpl extends BaseHandler implements ChainRequestHandler
      */
     private $tokens;
 
-    public function __construct(TokenService $tokens)
+    /**
+     * @var AuditLog
+     */
+    private $audit;
+
+    public function __construct(TokenService $tokens, AuditLog $audit)
     {
         $this->tokens = $tokens;
+        $this->audit = $audit;
     }
 
     public function handle()
@@ -77,6 +85,12 @@ final class OauthManagerImpl extends BaseHandler implements ChainRequestHandler
         global $ilUser;
 
         $oauthData = $this->tokens->issuePair((int) $ilUser->getId());
+
+        $this->audit->setActor((int) $ilUser->getId());
+        $this->audit->log(AuditLog::EVENT_APP_LOGIN, AuditLog::LEVEL_NOTICE, [
+            'refresh_fp' => AuditLog::fingerprint(TokenCodec::normalize($oauthData['refresh_token'])),
+            'access_expires_in' => $oauthData['expires_in'],
+        ]);
 
         return [
             $ilUser->getId(),

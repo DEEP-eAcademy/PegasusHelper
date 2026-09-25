@@ -120,7 +120,10 @@ final class ResourceLinkHandlerImpl extends BaseHandler implements ResourceLinkH
 			$token = filter_input(INPUT_GET, self::GET_TOKEN, FILTER_UNSAFE_RAW, ['flags' => FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH]);
 			$token = is_string($token) ? $token : '';
 			$user = filter_input(INPUT_GET, self::GET_USER, FILTER_VALIDATE_INT, [ "min_range" => 0, "default" => 0 ]);
-			$this->authenticator->authenticate($user, $token);
+			$this->authenticator->authenticate($user, $token, [
+				'via' => 'resource',
+				'resource' => $this->http->request()->getUri()->getPath(),
+			]);
 			$this->invokeWebAccessChecker();
 		}
 	}

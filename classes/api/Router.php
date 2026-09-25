@@ -25,7 +25,7 @@ final class Router
     public const AUTH_NONE = 'none';
 
     /**
-     * @var array<int, array{method:string, regex:string, names:string[], handler:callable, auth:string}>
+     * @var array<int, array{method:string, pattern:string, regex:string, names:string[], handler:callable, auth:string}>
      */
     private $routes = [];
 
@@ -50,6 +50,7 @@ final class Router
 
         $this->routes[] = [
             'method' => $method,
+            'pattern' => $pattern,
             'regex' => '#^' . $regex . '$#',
             'names' => $names,
             'handler' => $handler,
@@ -81,7 +82,7 @@ final class Router
             array_shift($m);
             $params = count($route['names']) > 0 ? array_combine($route['names'], $m) : [];
 
-            return new MatchedRoute($route['handler'], $params, $route['auth']);
+            return new MatchedRoute($route['handler'], $params, $route['auth'], $route['pattern']);
         }
 
         if ($found404ForOtherMethod) {

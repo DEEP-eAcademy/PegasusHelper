@@ -14,6 +14,7 @@ use SRAG\PegasusHelper\api\controller\TokenController;
 use SRAG\PegasusHelper\api\LearningModuleZipBuilder;
 use SRAG\PegasusHelper\api\ObjectDataMapper;
 use SRAG\PegasusHelper\api\Router;
+use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\authentication\AuthTokenRepository;
 use SRAG\PegasusHelper\oauth\ApiSettings;
 use SRAG\PegasusHelper\oauth\RefreshTokenRepository;
@@ -65,7 +66,8 @@ final class ApiProvider implements ServiceProviderInterface
                 $c[TokenCodec::class],
                 $c[ApiSettings::class],
                 $c[RefreshTokenRepository::class],
-                $c[RevocationRepository::class]
+                $c[RevocationRepository::class],
+                $c[AuditLog::class]
             );
         });
 
@@ -122,8 +124,8 @@ final class ApiProvider implements ServiceProviderInterface
             return $objectController()->object($request, $params);
         });
 
-        $fileController = static function (): FileController {
-            return new FileController();
+        $fileController = static function () use ($c): FileController {
+            return new FileController($c[AuditLog::class]);
         };
         $router->get('/v3/ilias-app/files/{refId}', function ($request, $params) use ($fileController) {
             return $fileController()->metadata($request, $params);
@@ -146,7 +148,7 @@ final class ApiProvider implements ServiceProviderInterface
         });
 
         $learningModuleController = function () use ($c) {
-            return new LearningModuleController($c[LearningModuleZipBuilder::class], $c[AuthTokenRepository::class]);
+            return new LearningModuleController($c[LearningModuleZipBuilder::class], $c[AuthTokenRepository::class], $c[AuditLog::class]);
         };
         $router->get('/v1/learning-module/{refId}', function ($request, $params) use ($learningModuleController) {
             return $learningModuleController()->metadata($request, $params);

@@ -26,11 +26,19 @@ final class MatchedRoute
      */
     private $auth;
 
-    public function __construct(callable $handler, array $params, string $auth)
+    /**
+     * @var string the route pattern as registered, e.g. `/v1/files/{refId}`
+     *             -- kept for the audit log, so entries group by route rather
+     *             than by raw (id-bearing) path
+     */
+    private $pattern;
+
+    public function __construct(callable $handler, array $params, string $auth, string $pattern)
     {
         $this->handler = $handler;
         $this->params = $params;
         $this->auth = $auth;
+        $this->pattern = $pattern;
     }
 
     public function getHandler(): callable
@@ -49,5 +57,10 @@ final class MatchedRoute
     public function getAuth(): string
     {
         return $this->auth;
+    }
+
+    public function getPattern(): string
+    {
+        return $this->pattern;
     }
 }

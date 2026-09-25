@@ -65,3 +65,15 @@ msg_icon_saved_pre#:#Icon '
 msg_icon_saved_post#:#' wurde gespeichert<br/>
 msg_icons_reset#:#Die Icons wurden zurückgesetzt
 msg_icons_not_saved#:#Die Icons konnten nicht geladen werden
+form_audit_logging#:#Audit-Protokollierung
+txt_audit_channel#:#Log-Kanal
+txt_info_audit_channel#:#Die Stufe dieses Kanals kann unter Administration > Systemeinstellungen und Wartung > Protokollierung angepasst werden (dort aufgeführt als "Unknown (sragpegasushelper)").
+txt_audit_state#:#Aktuell protokolliert
+txt_audit_state_unavailable#:#Nicht bestimmbar (ILIAS-Protokollierung nicht verfügbar)
+txt_audit_state_disabled#:#Nichts -- die ILIAS-Protokollierung ist systemweit deaktiviert
+txt_audit_state_all#:#Alle Ereignisse (Routineaktivität und höher)
+txt_audit_state_notice#:#Bedeutsame Ereignisse und höher (Routineaktivität wird unterdrückt)
+txt_audit_state_warning#:#Nur verdächtige/fehlgeschlagene Ereignisse und höher
+txt_audit_state_error#:#Nur Serverfehler
+txt_audit_log_file#:#Log-Datei
+txt_audit_cache_warning#:#Für diese Installation ist Log-Caching aktiviert. Einträge unterhalb der Cache-Stufe können stillschweigend verworfen werden, auch wenn dieser Kanal sie eigentlich protokollieren würde.

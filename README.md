@@ -16,6 +16,8 @@ Features:
 - Configure dynamic theme of the ILIAS-Pegasus community app
 - Basic user token statistic
 - Basic plugin setup tests which verify your local ILIAS configuration
+- Audit logging of logins, token issuance/refresal/rejection, downloads and
+  admin configuration changes, integrated with ILIAS's own logging system
 
 ## Requirements
 
@@ -139,6 +141,46 @@ location ~ ^/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/P
 If you do deploy `testing/external/run.php` on a separate host, copy
 `secret.php.dist` to `secret.php` there and set a random secret first --
 the script refuses every request until that file exists.
+
+## Audit logging
+
+Every security- or audit-relevant event -- app/SSO logins, token issuance,
+refresh and rejection (with a reason), file and learning-module downloads, and
+admin changes to the API secret, token TTLs, revocations, the signing salt and
+the app theme -- is written as a single-line, structured entry to ILIAS's own
+logging system, on a dedicated channel:
+
+```
+PEGASUS_AUDIT {"event":"auth.app_login","ts":"2025-01-01T12:00:00+00:00","request_id":"a1b2c3d4e5f6a7b8","client":"default","user_id":6,"login":"jdoe","ip":"203.0.113.7","forwarded_for":null,"user_agent":"...","refresh_fp":"9f2c...","access_expires_in":3600}
+```
+
+- **Where it goes:** the normal ILIAS log file (`ilias.log`, see the `[log]`
+  section of `ilias.ini.php`), channel `sragpegasushelper`. Grep and parse it:
+  ```bash
+  grep PEGASUS_AUDIT ilias.log | sed 's/.*PEGASUS_AUDIT //' | jq .
+  ```
+- **Level:** the update step that installs/updates this plugin seeds a
+  `log_components` row for the channel at INFO, so entries are written even if
+  the site's global log level default is higher. Adjust it per-channel under
+  **Administration > System Settings and Maintenance > Logging** (listed as
+  "Unknown (sragpegasushelper)"): raising it to NOTICE suppresses routine
+  activity and keeps only logins, downloads, 403s and admin changes; WARNING
+  keeps only suspicious/failed authentication; ERROR keeps only server errors.
+  The plugin's 'General' configuration tab shows the current effective state.
+- **Caching caveat:** if this ILIAS installation has log caching enabled
+  (`Administration > Logging`), entries below the *cache's* level can be
+  silently discarded even though the channel itself is set to write them. The
+  'General' tab warns about this when it detects caching is on.
+- **Never logged:** raw access/refresh/SSO tokens, the API secret, or the
+  signing salt. Tokens appear only as a short, non-reversible fingerprint
+  (`*_fp` fields); for refresh tokens this is a prefix of the same hash stored
+  in the `ui_uihk_peg_refresh` table, so a log line can be correlated with its
+  DB row without either revealing the token itself.
+- **Privacy note:** entries include the client IP and User-Agent, which are
+  personal data. There is no plugin-side retention/purge -- entries live as
+  long as your server's own rotation policy for `ilias.log` keeps them. If you
+  need indefinite retention or a searchable audit trail, configure `logrotate`
+  accordingly or ship `ilias.log` to a SIEM/log aggregator.
 
 ## Versioning
 

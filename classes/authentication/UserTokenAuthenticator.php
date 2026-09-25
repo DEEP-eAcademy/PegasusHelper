@@ -21,8 +21,11 @@ interface UserTokenAuthenticator
      *
      * @param int    $userId The id of the user which should be logged in.
      * @param string $token  The token which should be used to authenticate the user with the given id.
+     * @param array  $auditContext Extra fields for the audit log entry this call emits,
+     *                             e.g. `['via' => 'ref_link', 'ref_id' => 123, 'view' => 'default']`.
+     *                             See {@see \SRAG\PegasusHelper\audit\AuditLog::EVENT_SSO_LOGIN}.
      *
      * @return void
      */
-    public function authenticate($userId, $token);
+    public function authenticate($userId, $token, array $auditContext = []);
 }

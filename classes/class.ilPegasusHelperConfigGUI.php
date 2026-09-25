@@ -45,6 +45,14 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
     }
 
     /**
+     * @return \SRAG\PegasusHelper\audit\AuditLog
+     */
+    private function audit(): \SRAG\PegasusHelper\audit\AuditLog
+    {
+        return \SRAG\PegasusHelper\container\PegasusHelperContainer::resolve(\SRAG\PegasusHelper\audit\AuditLog::class);
+    }
+
+    /**
      * invoked by parent
      * @param $cmd string
      */
@@ -81,6 +89,10 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
                 break;
             case "testing_run_external_tests":
                 $ilTabs->setSubTabActive("id_testing");
+                $this->audit()->log(
+                    \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_EXTERNAL_TESTS_RUN,
+                    \SRAG\PegasusHelper\audit\AuditLog::LEVEL_INFO
+                );
                 $tpl->setContent($this->getTestsTableHtml(true));
                 break;
             case "theme":
@@ -123,6 +135,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
                     . $this->getRevokeUserFormHtml()
                     . $this->getRevokeAllFormHtml()
                     . $this->getRotateSaltFormHtml()
+                    . $this->getAuditStatusFormHtml()
                 );
                 break;
         }
@@ -197,9 +210,28 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         }
 
         $settings = new \SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
+        $oldSecret = $settings->getApiSecret();
+        $oldAccessTtl = $settings->getAccessTokenTtlMinutes();
+        $oldRefreshTtl = $settings->getRefreshTokenTtlMinutes();
+
         $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_API_SECRET, $secret);
         $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_ACCESS_TOKEN_TTL, (string) $accessTtl);
         $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_REFRESH_TOKEN_TTL, (string) $refreshTtl);
+
+        // Never log the secret itself, only whether it changed; TTLs are not
+        // secret, so their old/new values are logged as a diff.
+        $auditFields = ['api_secret_changed' => !hash_equals($oldSecret, $secret)];
+        if ($accessTtl !== $oldAccessTtl) {
+            $auditFields['access_token_ttl'] = [$oldAccessTtl, $accessTtl];
+        }
+        if ($refreshTtl !== $oldRefreshTtl) {
+            $auditFields['refresh_token_ttl'] = [$oldRefreshTtl, $refreshTtl];
+        }
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_API_SETTINGS_CHANGED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_NOTICE,
+            $auditFields
+        );
 
         $tpl->setOnScreenMessage('success', $this->pl->txt("msg_api_secret_saved"), true);
         $ilCtrl->redirect($this, "general");
@@ -240,12 +272,23 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $userId = $login !== "" ? \ilObjUser::_lookupId($login) : 0;
 
         if (!$userId) {
+            $this->audit()->log(
+                \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_TOKENS_REVOKED,
+                \SRAG\PegasusHelper\audit\AuditLog::LEVEL_WARNING,
+                ['scope' => 'user', 'target_login' => $login, 'outcome' => 'user_not_found']
+            );
             $tpl->setOnScreenMessage('failure', $this->pl->txt("msg_revoke_user_not_found"), true);
             $ilCtrl->redirect($this, "general");
             return;
         }
 
         (new \SRAG\PegasusHelper\oauth\RevocationRepository($ilDB))->revokeUser((int) $userId);
+
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_TOKENS_REVOKED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_NOTICE,
+            ['scope' => 'user', 'target_user_id' => (int) $userId, 'target_login' => $login]
+        );
 
         $tpl->setOnScreenMessage('success', $this->pl->txt("msg_revoke_user_done"), true);
         $ilCtrl->redirect($this, "general");
@@ -289,6 +332,12 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         }
 
         (new \SRAG\PegasusHelper\oauth\RevocationRepository($ilDB))->revokeAll();
+
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_TOKENS_REVOKED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_NOTICE,
+            ['scope' => 'all']
+        );
 
         $tpl->setOnScreenMessage('success', $this->pl->txt("msg_revoke_all_done"), true);
         $ilCtrl->redirect($this, "general");
@@ -335,8 +384,64 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $settings = new \SRAG\PegasusHelper\oauth\ApiSettings($ilDB);
         $settings->set(\SRAG\PegasusHelper\oauth\ApiSettings::KEY_SALT, bin2hex(random_bytes(32)));
 
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_SALT_ROTATED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_NOTICE
+        );
+
         $tpl->setOnScreenMessage('success', $this->pl->txt("msg_rotate_salt_done"), true);
         $ilCtrl->redirect($this, "general");
+    }
+
+    /**
+     * html of a read-only status block showing whether (and how much of) the
+     * audit trail is currently being written -- see \SRAG\PegasusHelper\audit\AuditLog
+     * @return string
+     */
+    protected function getAuditStatusFormHtml()
+    {
+        $status = $this->audit()->status();
+
+        $form = new ilPropertyFormGUI();
+        $form->setTitle($this->pl->txt("form_audit_logging"));
+
+        $channel = new ilNonEditableValueGUI($this->pl->txt("txt_audit_channel"));
+        $channel->setInfo($this->pl->txt("txt_info_audit_channel"));
+        $channel->setValue(\SRAG\PegasusHelper\audit\AuditLog::CHANNEL);
+        $form->addItem($channel);
+
+        $state = new ilNonEditableValueGUI($this->pl->txt("txt_audit_state"));
+        if (!($status['available'] ?? false)) {
+            $state->setValue($this->pl->txt("txt_audit_state_unavailable"));
+        } elseif (($status['logging_enabled'] ?? false) === false) {
+            $state->setValue($this->pl->txt("txt_audit_state_disabled"));
+        } else {
+            $tierKeys = [
+                'INFO' => "txt_audit_state_all",
+                'NOTICE' => "txt_audit_state_notice",
+                'WARNING' => "txt_audit_state_warning",
+                'ERROR' => "txt_audit_state_error",
+            ];
+            $tierKey = $tierKeys[$status['lowest_level_written'] ?? ''] ?? "txt_audit_state_unavailable";
+            $state->setValue($this->pl->txt($tierKey));
+        }
+        $form->addItem($state);
+
+        if (!empty($status['log_dir']) || !empty($status['log_file'])) {
+            $path = new ilNonEditableValueGUI($this->pl->txt("txt_audit_log_file"));
+            $path->setValue(
+                rtrim((string) ($status['log_dir'] ?? ''), '/') . '/' . ltrim((string) ($status['log_file'] ?? ''), '/')
+            );
+            $form->addItem($path);
+        }
+
+        if (!empty($status['cache_enabled'])) {
+            $warning = new ilNonEditableValueGUI("", "", true);
+            $warning->setValue($this->pl->txt("txt_audit_cache_warning"));
+            $form->addItem($warning);
+        }
+
+        return $form->getHTML();
     }
 
     /**
@@ -539,6 +644,13 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $ilDB->update("ui_uihk_pegasus_theme", $values, $where);
 
         $this->updateTimestamp();
+
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_THEME_CHANGED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_INFO,
+            ['action' => 'save_colors', 'primary_color' => $primaryColor, 'contrast_color' => (int) $contrastColor]
+        );
+
         $tpl->setOnScreenMessage( 'success', $this->pl->txt("msg_coloring_saved"), true);
         $ilCtrl->redirect($this, "theme");
     }
@@ -560,6 +672,13 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         $ilDB->update("ui_uihk_pegasus_theme", $values, $where);
 
         $this->updateTimestamp();
+
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_THEME_CHANGED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_INFO,
+            ['action' => 'reset_colors']
+        );
+
         $tpl->setOnScreenMessage( 'success', $this->pl->txt("msg_coloring_reset"), true);
         $ilCtrl->redirect($this, "theme");
     }
@@ -581,6 +700,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
             // for each category, set the new icon
             $msgSuccess = "";
             $msgFail = "";
+            $savedCategories = [];
             foreach (ilPegasusHelperConfigGUI::$ICON_CATEGORIES as $category) {
                 $key = "post_icon_$category";
                 $file = $form->getInput($key);
@@ -595,6 +715,7 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
                             }
                             $DIC->upload()->moveOneFileTo($result, ilPegasusHelperConfigGUI::$ICON_WEB_DIR, \ILIAS\FileUpload\Location::WEB, $fileName);
                             $msgSuccess .= $this->pl->txt("msg_icon_saved_pre") . $category . $this->pl->txt("msg_icon_saved_post");
+                            $savedCategories[] = $category;
                         }
                     } else {
                         if ($result->getName()) {
@@ -604,6 +725,14 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
                 }
             }
             $this->updateTimestamp();
+
+            if ($savedCategories !== []) {
+                $this->audit()->log(
+                    \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_THEME_CHANGED,
+                    \SRAG\PegasusHelper\audit\AuditLog::LEVEL_INFO,
+                    ['action' => 'save_icons', 'categories' => $savedCategories]
+                );
+            }
             // user feedback
             if ($msgSuccess) {
                 $tpl->setOnScreenMessage( 'success', $msgSuccess, true);
@@ -628,6 +757,13 @@ final class ilPegasusHelperConfigGUI extends ilPluginConfigGUI
         ilPegasusHelperConfigGUI::copyDefaultIcons();
 
         $this->updateTimestamp();
+
+        $this->audit()->log(
+            \SRAG\PegasusHelper\audit\AuditLog::EVENT_ADMIN_THEME_CHANGED,
+            \SRAG\PegasusHelper\audit\AuditLog::LEVEL_INFO,
+            ['action' => 'reset_icons']
+        );
+
         $tpl->setOnScreenMessage( 'success', $this->pl->txt("msg_icons_reset"), true);
         $ilCtrl->redirect($this, "theme");
     }

@@ -3,6 +3,7 @@
 namespace SRAG\PegasusHelper\authentication;
 
 use ilAuthSession;
+use SRAG\PegasusHelper\audit\AuditLog;
 
 /**
  * Class DefaultUserTokenAuthenticator
@@ -27,9 +28,15 @@ final class DefaultUserTokenAuthenticator implements UserTokenAuthenticator
      */
     private $tokens;
 
-    public function __construct(AuthTokenRepository $tokens)
+    /**
+     * @var AuditLog
+     */
+    private $audit;
+
+    public function __construct(AuthTokenRepository $tokens, AuditLog $audit)
     {
         $this->tokens = $tokens;
+        $this->audit = $audit;
     }
 
     /**
@@ -38,10 +45,11 @@ final class DefaultUserTokenAuthenticator implements UserTokenAuthenticator
      *
      * @param int       $userId The id of the user which should be logged in.
      * @param string    $token  The token which should be used to authenticate the user with the given id.
+     * @param array     $auditContext see {@see UserTokenAuthenticator::authenticate()}
      *
      * @return void
      */
-    public function authenticate($userId, $token)
+    public function authenticate($userId, $token, array $auditContext = [])
     {
         global $DIC;
         /**
@@ -50,7 +58,15 @@ final class DefaultUserTokenAuthenticator implements UserTokenAuthenticator
         $ilAuthSession = $DIC['ilAuthSession'];
         $user = $DIC->user();
 
-        if ($this->tokens->consume((int) $userId, (string) $token)) {
+        // The pre-existing session user, if any -- worth recording when it
+        // differs from the token's claimed user (e.g. link for user Y opened
+        // in a browser already logged in as user X).
+        $previousUserId = (int) $user->getId();
+        $previousUserId = $previousUserId > 0 ? $previousUserId : null;
+
+        $status = $this->tokens->consume((int) $userId, (string) $token);
+
+        if ($status === AuthTokenRepository::STATUS_CONSUMED) {
             // log in user
             $ilAuthSession->regenerateId();
             $ilAuthSession->setUserId((int) $userId);
@@ -58,6 +74,23 @@ final class DefaultUserTokenAuthenticator implements UserTokenAuthenticator
 
             $user->setId((int) $userId);
             $user->read();
+
+            $this->audit->setActor((int) $userId);
+            $this->audit->log(AuditLog::EVENT_SSO_LOGIN, AuditLog::LEVEL_INFO, $auditContext);
+
+            return;
         }
+
+        $reason = $status === AuthTokenRepository::STATUS_EXPIRED ? 'sso_token_expired' : 'sso_token_unknown';
+        $level = $reason === 'sso_token_expired' ? AuditLog::LEVEL_INFO : AuditLog::LEVEL_WARNING;
+
+        $fields = $auditContext;
+        $fields['reason'] = $reason;
+        $fields['claimed_user_id'] = (int) $userId;
+        if ($previousUserId !== null && $previousUserId !== (int) $userId) {
+            $fields['previous_user_id'] = $previousUserId;
+        }
+
+        $this->audit->log(AuditLog::EVENT_SSO_LOGIN_FAILED, $level, $fields);
     }
 }

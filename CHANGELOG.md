@@ -4,7 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [7.1.0]
+## [7.2.0]
+### Added
+- Audit logging, integrated with ILIAS's own logging system
+  (`classes/audit/AuditLog.php`), on a dedicated `sragpegasushelper` channel:
+  one structured `PEGASUS_AUDIT {json}` entry per `api.php` request, plus
+  richer entries for app/SSO logins, token issuance/refresh/rejection (with a
+  reason -- missing, malformed, expired, revoked, wrong client, ...), file and
+  learning-module downloads, and every admin change on the 'General' and
+  'App Theme' tabs (API secret/TTL changes, token revocations, signing-salt
+  rotation, theme/icon changes, running the external tests). Entries carry the
+  client IP, User-Agent and a short, non-reversible token fingerprint, and
+  never the token/secret/salt itself. The database update step seeds the
+  channel's log level at INFO so entries are written regardless of the site's
+  global default; the plugin's 'General' tab shows the channel's current
+  effective state
+### Changed
+- `AuthTokenRepository::consume()` now returns which of three outcomes
+  occurred (consumed / unknown / expired) instead of a bare bool, so a failed
+  SSO login can be audited with a reason instead of a generic failure
 ### Added
 - Token revocation: an admin can invalidate every access/refresh token already
   issued to one user, or to everyone at once, from the plugin's 'General' tab

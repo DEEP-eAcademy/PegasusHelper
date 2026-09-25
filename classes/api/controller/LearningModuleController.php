@@ -8,6 +8,7 @@ use SRAG\PegasusHelper\api\ApiInitialisation;
 use SRAG\PegasusHelper\api\JsonResponse;
 use SRAG\PegasusHelper\api\LearningModuleZipBuilder;
 use SRAG\PegasusHelper\api\Request;
+use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\authentication\AuthTokenRepository;
 
 /**
@@ -33,10 +34,16 @@ final class LearningModuleController
      */
     private $authTokens;
 
-    public function __construct(LearningModuleZipBuilder $zipBuilder, AuthTokenRepository $authTokens)
+    /**
+     * @var AuditLog
+     */
+    private $audit;
+
+    public function __construct(LearningModuleZipBuilder $zipBuilder, AuthTokenRepository $authTokens, AuditLog $audit)
     {
         $this->zipBuilder = $zipBuilder;
         $this->authTokens = $authTokens;
+        $this->audit = $audit;
     }
 
     /**
@@ -72,11 +79,18 @@ final class LearningModuleController
         $userId = (int) ($request->query('user') ?? '0');
         $token = (string) ($request->query('token') ?? '');
 
-        if ($userId <= 0 || $token === '' || !$this->authTokens->consume($userId, $token)) {
-            throw ApiException::unauthorized('Invalid token');
+        if ($userId <= 0 || $token === '') {
+            throw ApiException::unauthorized('Invalid token')->withReason('missing_sso_token');
+        }
+
+        $status = $this->authTokens->consume($userId, $token);
+        if ($status !== AuthTokenRepository::STATUS_CONSUMED) {
+            $reason = $status === AuthTokenRepository::STATUS_EXPIRED ? 'sso_token_expired' : 'sso_token_unknown';
+            throw ApiException::unauthorized('Invalid token')->withReason($reason);
         }
 
         ApiInitialisation::loadUser($userId);
+        $this->audit->setActor($userId);
 
         global $DIC;
         if (!$DIC->access()->checkAccess('read', '', $refId)) {
@@ -84,6 +98,13 @@ final class LearningModuleController
         }
 
         [$objId, $type] = $this->resolveLearningModule($refId);
+
+        $this->audit->log(AuditLog::EVENT_LM_DOWNLOAD, AuditLog::LEVEL_INFO, [
+            'ref_id' => $refId,
+            'obj_id' => $objId,
+            'type' => $type,
+        ]);
+
         $this->zipBuilder->streamZip($objId, $type);
     }
 

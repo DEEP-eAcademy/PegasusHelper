@@ -26,6 +26,12 @@ final class ApiException extends Exception
      */
     private $headers;
 
+    /**
+     * @var string|null internal-only reason code for the audit log; never
+     *                  sent to the client (see {@see getBody()})
+     */
+    private $reason;
+
     public function __construct(int $statusCode, array $body, array $headers = [], ?Throwable $previous = null)
     {
         parent::__construct($body['cause'] ?? $body['message'] ?? 'API error', $statusCode, $previous);
@@ -71,5 +77,25 @@ final class ApiException extends Exception
     public function getStatusCode(): int
     {
         return $this->code;
+    }
+
+    /**
+     * Attaches an internal-only reason code (e.g. 'expired', 'revoked'), for
+     * the audit log. The HTTP response body is unaffected -- callers on the
+     * wire cannot distinguish reasons this way, only the log can.
+     *
+     * @param string $reason
+     * @return $this
+     */
+    public function withReason(string $reason): self
+    {
+        $this->reason = $reason;
+
+        return $this;
+    }
+
+    public function getReason(): ?string
+    {
+        return $this->reason;
     }
 }

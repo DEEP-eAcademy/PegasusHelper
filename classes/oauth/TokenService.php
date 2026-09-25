@@ -3,6 +3,7 @@
 namespace SRAG\PegasusHelper\oauth;
 
 use SRAG\PegasusHelper\api\ApiException;
+use SRAG\PegasusHelper\audit\AuditLog;
 
 /**
  * Class TokenService
@@ -45,16 +46,23 @@ final class TokenService
      */
     private $revocations;
 
+    /**
+     * @var AuditLog
+     */
+    private $audit;
+
     public function __construct(
         TokenCodec $codec,
         ApiSettings $settings,
         RefreshTokenRepository $refreshTokens,
-        RevocationRepository $revocations
+        RevocationRepository $revocations,
+        AuditLog $audit
     ) {
         $this->codec = $codec;
         $this->settings = $settings;
         $this->refreshTokens = $refreshTokens;
         $this->revocations = $revocations;
+        $this->audit = $audit;
     }
 
     /**
@@ -103,7 +111,7 @@ final class TokenService
     public function validateAccess(?string $rawToken): int
     {
         if ($rawToken === null || $rawToken === '') {
-            throw ApiException::unauthorized('Missing access token');
+            throw ApiException::unauthorized('Missing access token')->withReason('missing_token');
         }
 
         $token = $this->decodeAndCheck($rawToken, TokenCodec::CLASS_ACCESS);
@@ -124,32 +132,42 @@ final class TokenService
     public function refresh(?string $apiKey, ?string $apiSecret, ?string $refreshToken): array
     {
         if ($refreshToken === null || $refreshToken === '') {
-            throw ApiException::badRequest('Missing refresh_token');
+            throw ApiException::badRequest('Missing refresh_token')->withReason('missing_refresh_token');
         }
         if ($apiKey === null || $apiKey === '') {
-            throw ApiException::badRequest('Missing api_key');
+            throw ApiException::badRequest('Missing api_key')->withReason('missing_api_key');
         }
 
         if (!hash_equals($this->settings->getApiKey(), $apiKey)) {
-            throw ApiException::unauthorized('Unknown client');
+            throw ApiException::unauthorized('Unknown client')->withReason('unknown_client');
         }
         if (!hash_equals($this->settings->getApiSecret(), (string) $apiSecret)) {
-            throw ApiException::unauthorized('Invalid client secret');
+            throw ApiException::unauthorized('Invalid client secret')->withReason('invalid_client_secret');
         }
 
         $token = $this->decodeAndCheck($refreshToken, TokenCodec::CLASS_REFRESH);
         $normalized = $this->codec->normalize($refreshToken);
 
         if (!$this->refreshTokens->exists($normalized)) {
-            throw ApiException::unauthorized('Refresh token has been revoked');
+            throw ApiException::unauthorized('Refresh token has been revoked')->withReason('refresh_token_unknown');
         }
 
         $this->refreshTokens->touch($normalized);
 
+        $userId = (int) $token['user_id'];
+        $this->audit->setActor($userId);
+
         // Issue a fresh pair, but keep the old refresh token valid until it expires
         // on its own: the app can fire several concurrent refreshes with the same
         // refresh token, and invalidating it immediately would break that.
-        return $this->issuePair((int) $token['user_id']);
+        $pair = $this->issuePair($userId);
+
+        $this->audit->log(AuditLog::EVENT_TOKEN_REFRESH, AuditLog::LEVEL_INFO, [
+            'refresh_fp' => AuditLog::fingerprint($normalized),
+            'new_refresh_fp' => AuditLog::fingerprint($this->codec->normalize($pair['refresh_token'])),
+        ]);
+
+        return $pair;
     }
 
     /**
@@ -183,24 +201,27 @@ final class TokenService
         $normalized = $this->codec->normalize($rawToken);
         $token = $this->codec->deserialize($normalized);
 
-        if ($token === null || !$this->codec->isValid($token)) {
-            throw ApiException::unauthorized('Invalid token');
+        if ($token === null) {
+            throw ApiException::unauthorized('Invalid token')->withReason('malformed');
+        }
+        if (!$this->codec->isValid($token)) {
+            throw ApiException::unauthorized('Invalid token')->withReason('invalid_signature');
         }
         if ($token['class'] !== $expectedClass) {
-            throw ApiException::unauthorized('Invalid token');
+            throw ApiException::unauthorized('Invalid token')->withReason('wrong_token_class');
         }
         if ($this->codec->isExpired($token)) {
-            throw ApiException::unauthorized('Token has expired');
+            throw ApiException::unauthorized('Token has expired')->withReason('expired');
         }
         if (!hash_equals($this->settings->getApiKey(), (string) $token['api_key'])) {
-            throw ApiException::unauthorized('Invalid token');
+            throw ApiException::unauthorized('Invalid token')->withReason('api_key_mismatch');
         }
         $iliasClient = defined('CLIENT_ID') ? CLIENT_ID : '';
         if (!hash_equals($iliasClient, (string) $token['ilias_client'])) {
-            throw ApiException::unauthorized('Invalid token');
+            throw ApiException::unauthorized('Invalid token')->withReason('client_mismatch');
         }
         if ($this->revocations->isRevoked((int) $token['user_id'], TokenCodec::issuedAt($token))) {
-            throw ApiException::unauthorized('Token has been revoked');
+            throw ApiException::unauthorized('Token has been revoked')->withReason('revoked');
         }
 
         return $token;

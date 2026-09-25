@@ -123,15 +123,18 @@ final class ApiInitialisation extends \ilInitialisation
     public static function loadUser(int $userId): ilObjUser
     {
         if ($userId <= 0 || (defined('ANONYMOUS_USER_ID') && $userId === ANONYMOUS_USER_ID)) {
-            throw ApiException::unauthorized('Invalid token');
+            throw ApiException::unauthorized('Invalid token')->withReason('invalid_user_id');
         }
-        if (!ilObject::_exists($userId, false, 'usr') || !ilObjUser::_lookupActive($userId)) {
-            throw ApiException::unauthorized('Invalid token');
+        if (!ilObject::_exists($userId, false, 'usr')) {
+            throw ApiException::unauthorized('Invalid token')->withReason('user_not_found');
+        }
+        if (!ilObjUser::_lookupActive($userId)) {
+            throw ApiException::unauthorized('Invalid token')->withReason('user_inactive');
         }
 
         $user = new ilObjUser($userId);
         if (!$user->checkTimeLimit()) {
-            throw ApiException::unauthorized('Invalid token');
+            throw ApiException::unauthorized('Invalid token')->withReason('user_time_limit');
         }
 
         global $DIC, $ilias;

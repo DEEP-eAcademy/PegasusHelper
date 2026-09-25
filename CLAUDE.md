@@ -10,7 +10,7 @@ Since version 7.0.0, PegasusHelper is fully self-contained: it no longer depends
 
 **Target ILIAS versions:** 10.x  
 **PHP version:** 8.2+  
-**Current version:** 7.0.0
+**Current version:** 7.2.0
 
 ## Quick Commands
 
@@ -47,7 +47,7 @@ The plugin follows ILIAS 10 plugin conventions as a `UserInterfaceHook` plugin:
 - **Plugin entry point:** `class.ilPegasusHelperPlugin.php` — singleton that extends `ilUserInterfaceHookPlugin`
 - **Configuration GUI:** `class.ilPegasusHelperConfigGUI.php` — admin configuration interface
 - **UI Hook GUI:** `class.ilPegasusHelperUIHookGUI.php` — handles UI hook integration points
-- **Lifecycle hooks:** `beforeUninstall()` in the main plugin class drops the plugin's own tables (`ui_uihk_pegasus_theme`, `ui_uihk_peg_config`/`refresh`/`token`/`revoke`). There is no `beforeUpdate()` prerequisite check since 7.0.0 (it used to require the ILIAS REST plugin). Note the `ui_uihk_peg_*` (not `pegasus`) prefix on the newer tables -- see the dbupdate #12/#13 comments for why.
+- **Lifecycle hooks:** `beforeUninstall()` in the main plugin class drops the plugin's own tables (`ui_uihk_pegasus_theme`, `ui_uihk_peg_config`/`refresh`/`token`/`revoke`), and also deletes the audit-log channel's `log_components` row (a core ILIAS table, seeded by dbupdate step #18 — see "Audit logging" below). There is no `beforeUpdate()` prerequisite check since 7.0.0 (it used to require the ILIAS REST plugin). Note the `ui_uihk_peg_*` (not `pegasus`) prefix on the newer tables -- see the dbupdate #12/#13 comments for why.
 
 ### Chain of Responsibility Pattern
 
@@ -73,6 +73,7 @@ The plugin uses a custom DI container for service provisioning:
 
 - **PegasusHelperContainer** (`classes/container/PegasusHelperContainer.php`) — bootstrapped in `bootstrap.php` during plugin initialization, and again (idempotently) by `api.php` right after it boots ILIAS itself
 - **Service Providers:**
+  - `AuditProvider` — registers `audit\AuditLog` as a **shared** service; registered first, since it's injected into services registered by every provider below (see "Audit logging" below)
   - `AuthenticationProvider` — registers authentication services (`authentication\AuthTokenRepository`, the SSO one-time-token repository; `UserTokenAuthenticator`)
   - `Ilias6RequestHandlerProvider` — registers the handler chain (the only provider still wired up; the historical `Ilias53RequestHandlerProvider`/`Ilias54RequestHandlerProvider` were dead code and have been removed)
   - `ApiProvider` — registers the OAuth services (`oauth\TokenCodec`/`TokenService`/`ApiSettings`/`RefreshTokenRepository`/`RevocationRepository`), the request mapping helpers, and the `api\Router` route table (see below)
@@ -103,6 +104,15 @@ The container validates ILIAS version >= 9.0 at bootstrap time and throws `Depen
 - **`AuthTokenRepository`** — the short-lived (60s), one-time SSO auth-tokens used to open ILIAS pages/resources from the app (`ui_uihk_peg_token`), replacing the REST plugin's `ui_uihk_rest_token` table.
 - **`UserTokenAuthenticator`** interface — token validation strategy.
 - **`DefaultUserTokenAuthenticator`** — logs the user into a real ILIAS web session; used by the `goto.php`/resource-link handlers, which run inside a normal ILIAS request that already has a session. **Never** use this from inside `api.php` — that request has no session and must stay stateless; the learning-module zip route instead calls `AuthTokenRepository::consume()` directly, followed by `ApiInitialisation::loadUser()`.
+
+### Audit logging (`classes/audit/`)
+
+- **`AuditLog`** — writes one structured `PEGASUS_AUDIT {json}` entry per audit-relevant event to a dedicated ILIAS log channel (`sragpegasushelper`, `AuditLog::CHANNEL`), via `ilLoggerFactory::getLogger()`. Registered as a **shared** Pimple service (`AuditProvider`, registered first in `PegasusHelperContainer::bootstrap()`), so `request_id` and the actor set via `setActor()` stay the same for every entry written while handling one request. Every write is wrapped so a logging failure can never break the request it is auditing — it falls back to `error_log()`.
+- **Where entries come from:** `api\ApiKernel::auditRequest()` (a `register_shutdown_function` hook, not an inline call — two routes stream their response and `exit()` mid-handler) emits one `api.request` entry per `api.php` call; `oauth\TokenService`, the SSO handlers/`DefaultUserTokenAuthenticator`, `OauthManagerImpl`, `FileController`/`LearningModuleController`, and every write action on `ilPegasusHelperConfigGUI`'s 'General'/'App Theme' tabs emit their own richer, event-specific entries (see `AuditLog::EVENT_*`).
+- **Reason codes:** `ApiException::withReason()`/`getReason()` carries an internal-only reason (e.g. `expired`, `revoked`, `invalid_signature`) into the log without changing the JSON error body sent to the client — don't conflate the two. `AuthTokenRepository::consume()` similarly returns a `STATUS_*` outcome (consumed/unknown/expired) rather than a bare bool, for the same reason.
+- **Never log a raw access/refresh/SSO token, the API secret, or the signing salt.** Use `AuditLog::fingerprint()` (first 16 hex chars of `sha256(normalized token)` — a prefix of `RefreshTokenRepository`'s own `token_hash` column) instead. `AuditLog` also strips a fixed list of sensitive field names from any entry as a defence in depth, but don't rely on that — it's a backstop, not a reason to pass a secret in.
+- **Severity:** `AuditLog::LEVEL_*` (mirrors `\ilLogLevel`'s int values without depending on that class existing): INFO for routine activity, NOTICE for logins/403s/admin changes, WARNING for forged/mismatched/revoked tokens, ERROR for 5xx. `ApiKernel::tierFor()` is the canonical mapping for `api.request` entries.
+- **Level control:** `sql/dbupdate.php` step #18 seeds a `log_components` row for the channel at INFO, so entries are written regardless of the site's global log level default; an admin can raise/lower it from Administration > Logging. The plugin's 'General' tab (`ilPegasusHelperConfigGUI::getAuditStatusFormHtml()`) shows the channel's current effective state, including a warning if ILIAS log caching would suppress entries below its own level.
 
 ### Migration (`classes/migration/RestPluginMigration.php`)
 
@@ -136,4 +146,6 @@ Use this when installation fails to diagnose configuration issues.
 
 4. **Configuration scope:** Plugin configuration (API key/secret, token salt/TTLs) persists in `ui_uihk_peg_config`, managed by `oauth\ApiSettings`; defaults are set (or migrated from the REST plugin) by `migration\RestPluginMigration` during the database update.
 
-5. **Autoloading:** PSR-4 autoloading is configured for the `SRAG\PegasusHelper\` namespace pointing to `classes/`. Class map entries exist for legacy ILIAS plugin classes (ilPegasusHelperConfigGUI, etc.).
+5. **Autoloading:** PSR-4 autoloading is configured for the `SRAG\PegasusHelper\` namespace pointing to `classes/`. Class map entries exist for legacy ILIAS plugin classes (ilPegasusHelperConfigGUI, etc.). The classmap is **authoritative** (`composer.json`'s `classmap-authoritative`), so a new class under `classes/` doesn't autoload until you run `composer dump-autoload -o` and commit the regenerated `vendor/composer/autoload_*.php`.
+
+6. **Never log a raw token or secret:** an access/refresh/SSO token, the API secret, or the signing salt must never be passed to `audit\AuditLog::log()` (or to any other logger) in cleartext. Use `AuditLog::fingerprint()` for a token, and log only whether a secret changed, never its value — see "Audit logging" above.

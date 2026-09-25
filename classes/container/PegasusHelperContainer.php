@@ -5,6 +5,7 @@ namespace SRAG\PegasusHelper\container;
 use ILIAS\DI\Container;
 use SRAG\PegasusHelper\container\exception\DependencyResolutionException;
 use SRAG\PegasusHelper\container\provider\ApiProvider;
+use SRAG\PegasusHelper\container\provider\AuditProvider;
 use SRAG\PegasusHelper\container\provider\AuthenticationProvider;
 use SRAG\PegasusHelper\container\provider\Ilias6RequestHandlerProvider;
 
@@ -63,6 +64,10 @@ final class PegasusHelperContainer
             return;
         }
         static::$container = $container;
+
+        // Registered first: AuditLog is injected into services registered by
+        // every provider below.
+        static::$container->register(new AuditProvider());
 
         static::$container->register(new AuthenticationProvider());
         if (version_compare(ILIAS_VERSION_NUMERIC, '9.0', '<')) {

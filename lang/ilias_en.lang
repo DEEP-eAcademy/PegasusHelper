@@ -65,3 +65,15 @@ msg_icon_saved_pre#:#Icon for '
 msg_icon_saved_post#:#' saved successfully<br/>
 msg_icons_reset#:#App icons reset successfully
 msg_icons_not_saved#:#Unable to upload icons
+form_audit_logging#:#Audit Logging
+txt_audit_channel#:#Log Channel
+txt_info_audit_channel#:#Set this channel's level under Administration > System Settings and Maintenance > Logging (it is listed as "Unknown (sragpegasushelper)").
+txt_audit_state#:#Currently Writing
+txt_audit_state_unavailable#:#Unable to determine (ILIAS logging is not available)
+txt_audit_state_disabled#:#Nothing -- ILIAS logging is disabled site-wide
+txt_audit_state_all#:#All events (routine activity and above)
+txt_audit_state_notice#:#Significant events and above (routine activity is suppressed)
+txt_audit_state_warning#:#Suspicious/failed events and above only
+txt_audit_state_error#:#Server errors only
+txt_audit_log_file#:#Log File
+txt_audit_cache_warning#:#ILIAS log caching is enabled for this installation. Entries below the cache's own level may be silently discarded even though this channel is configured to write them.

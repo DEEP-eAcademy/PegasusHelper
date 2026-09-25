@@ -7,6 +7,7 @@ use ILIAS\HTTP\Cookies\CookieFactory;
 use ILIAS\HTTP\Cookies\CookieFactoryImpl;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
+use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\authentication\UserTokenAuthenticator;
 use SRAG\PegasusHelper\handler\ExcludedHandler\ExcludedHandler;
 use SRAG\PegasusHelper\handler\ExcludedHandler\v52\ExcludedHandlerImpl;
@@ -50,7 +51,7 @@ final class Ilias6RequestHandlerProvider implements ServiceProviderInterface
         });
 
         $pimple[OAuthManager::class] = $pimple->factory(function ($c) {
-            return new OauthManagerImpl($c[TokenService::class]);
+            return new OauthManagerImpl($c[TokenService::class], $c[AuditLog::class]);
         });
 
         $pimple[RefLinkRedirectHandler::class] = $pimple->factory(function ($c) {

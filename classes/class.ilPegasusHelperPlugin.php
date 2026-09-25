@@ -69,6 +69,18 @@ final class ilPegasusHelperPlugin extends ilUserInterfaceHookPlugin
             // table-name-length bug fixed in sql/dbupdate.php step #13.
             $ilDB->dropTable("ui_uihk_pegasus_config", $error_if_not_existing);
 
+            // Remove the audit-log channel's entry from ILIAS's own logging
+            // configuration (seeded by sql/dbupdate.php step #18); this is a
+            // core ILIAS table, not one of the plugin's own, so it is cleaned
+            // up here rather than with dropTable() above.
+            if ($ilDB->tableExists("log_components")) {
+                $ilDB->manipulateF(
+                    'DELETE FROM log_components WHERE component_id = %s',
+                    ['text'],
+                    ['sragpegasushelper']
+                );
+            }
+
             return true;
         } catch (Exception $e) {
             $tpl->setOnScreenMessage( 'failure', "There was a problem when uninstalling the PegasuHelper plugin", true);

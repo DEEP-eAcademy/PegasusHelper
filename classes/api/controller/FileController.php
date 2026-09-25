@@ -10,6 +10,7 @@ use SplFileInfo;
 use SRAG\PegasusHelper\api\ApiException;
 use SRAG\PegasusHelper\api\JsonResponse;
 use SRAG\PegasusHelper\api\Request;
+use SRAG\PegasusHelper\audit\AuditLog;
 
 /**
  * Class FileController
@@ -22,6 +23,16 @@ use SRAG\PegasusHelper\api\Request;
  */
 final class FileController
 {
+    /**
+     * @var AuditLog
+     */
+    private $audit;
+
+    public function __construct(AuditLog $audit)
+    {
+        $this->audit = $audit;
+    }
+
     /**
      * `GET /v3/ilias-app/files/{refId}`
      */
@@ -93,6 +104,15 @@ final class FileController
         }
 
         $file = $this->loadFile($refId);
+
+        $this->audit->log(AuditLog::EVENT_FILE_DOWNLOAD, AuditLog::LEVEL_INFO, [
+            'ref_id' => $refId,
+            'obj_id' => $file->getId(),
+            'file_name' => $file->getFileName(),
+            'file_version' => $file->getVersion(),
+            'file_size' => $file->getFileSize(),
+        ]);
+
         $file->sendFile();
     }
 

@@ -80,10 +80,25 @@ final class NewsLinkRedirectHandlerImpl extends BaseHandler
      * logs in and redirects the user to the news page.
      *
      * The token will always be deleted.
+     *
+     * This method runs only once per request to avoid recursive calls: ILIAS
+     * calls `getHTML()` (and thus the whole handler chain) more than once per
+     * request; the guard covers `authenticate()` too, not just `redirect()`,
+     * so a second pass never re-consumes the already-deleted token and logs a
+     * spurious failure right after the real success.
      */
     public function execute()
     {
-        $this->authenticator->authenticate($this->userId, $this->token);
+        if (self::$self_call) {
+            return;
+        }
+        self::$self_call = true;
+
+        $this->authenticator->authenticate($this->userId, $this->token, [
+            'via' => 'news_link',
+            'news_id' => (int) $this->newsId,
+            'news_context' => (int) $this->newsContext,
+        ]);
         $this->redirect();
     }
 
@@ -91,22 +106,16 @@ final class NewsLinkRedirectHandlerImpl extends BaseHandler
     /**
      * Redirects the user to the personal news page, with
      * the correct news selected.
-     *
-     * This methods redirects only once per request to avoid recursive calls.
      */
     private function redirect()
     {
-        if (!self::$self_call) {
-            self::$self_call = true;
+        $this->controlFlow->initBaseClass("ilDashboardGUI");
+        $this->controlFlow->setTargetScript('ilias.php');
+        $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "news_id", $this->newsId);
+        $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "news_context", $this->newsContext);
+        $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "block_type", "pdnews");
+        $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "col_side", "left");
 
-            $this->controlFlow->initBaseClass("ilDashboardGUI");
-            $this->controlFlow->setTargetScript('ilias.php');
-            $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "news_id", $this->newsId);
-            $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "news_context", $this->newsContext);
-            $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "block_type", "pdnews");
-            $this->controlFlow->setParameterByClass("ilpdnewsblockgui", "col_side", "left");
-
-            $this->controlFlow->redirectByClass(["ilDashboardGUI", "ilColumnGUI", "ilpdnewsblockgui"], "showNews");
-        }
+        $this->controlFlow->redirectByClass(["ilDashboardGUI", "ilColumnGUI", "ilpdnewsblockgui"], "showNews");
     }
 }

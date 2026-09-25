@@ -4,6 +4,7 @@ namespace SRAG\PegasusHelper\container\provider;
 
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
+use SRAG\PegasusHelper\audit\AuditLog;
 use SRAG\PegasusHelper\authentication\AuthTokenRepository;
 use SRAG\PegasusHelper\authentication\DefaultUserTokenAuthenticator;
 use SRAG\PegasusHelper\authentication\UserTokenAuthenticator;
@@ -30,7 +31,7 @@ final class AuthenticationProvider implements ServiceProviderInterface
         });
 
         $pimple[UserTokenAuthenticator::class] = function ($c) {
-            return new DefaultUserTokenAuthenticator($c[AuthTokenRepository::class]);
+            return new DefaultUserTokenAuthenticator($c[AuthTokenRepository::class], $c[AuditLog::class]);
         };
     }
 }

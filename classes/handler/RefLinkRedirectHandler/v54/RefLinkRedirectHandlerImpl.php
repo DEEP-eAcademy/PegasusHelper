@@ -84,10 +84,27 @@ final class RefLinkRedirectHandlerImpl extends BaseHandler implements RefLinkRed
      * If the user is already logged in, the user will be redirected.
      *
      * The token will always be deleted.
+     *
+     * This method runs only once per request to avoid recursive calls: ILIAS
+     * calls `getHTML()` (and thus the whole handler chain) more than once per
+     * request, and for a 'view' this class doesn't redirect for, a second
+     * pass would otherwise re-consume the already-deleted token and log a
+     * spurious "unknown token" failure right after the real success. The
+     * guard covers `authenticate()` too, not just `redirect()`, for exactly
+     * that reason.
      */
     public function execute()
     {
-        $this->authenticator->authenticate($this->userId, $this->token);
+        if (self::$self_call) {
+            return;
+        }
+        self::$self_call = true;
+
+        $this->authenticator->authenticate($this->userId, $this->token, [
+            'via' => 'ref_link',
+            'ref_id' => (int) $this->refId,
+            'view' => $this->view,
+        ]);
         $this->redirect();
     }
 
@@ -99,35 +116,29 @@ final class RefLinkRedirectHandlerImpl extends BaseHandler implements RefLinkRed
      *
      * * view 'default': goto the ref_id
      * * view 'timeline': goto the timeline of the ref_id
-     *
-     * This methods redirects only once per request to avoid recursive calls.
      */
     private function redirect()
     {
-        if (!self::$self_call) {
-            self::$self_call = true;
+        switch ($this->view) {
+            case "default":
+                $link = ilLink::_getLink($this->refId);
+                $this->ctrl->redirectToURL($link);
+                break;
+            case "timeline":
+                $type = ilObject2::_lookupType($this->refId, true);
 
-            switch ($this->view) {
-                case "default":
-                    $link = ilLink::_getLink($this->refId);
-                    $this->ctrl->redirectToURL($link);
-                    break;
-                case "timeline":
-                    $type = ilObject2::_lookupType($this->refId, true);
+                $this->ctrl->initBaseClass("ilrepositorygui");
+                $this->ctrl->setParameterByClass("ilnewstimelinegui", "ref_id", $this->refId);
+                $this->ctrl->setParameterByClass("ilnewstimelinegui", "cmd", "show");
 
-                    $this->ctrl->initBaseClass("ilrepositorygui");
-                    $this->ctrl->setParameterByClass("ilnewstimelinegui", "ref_id", $this->refId);
-                    $this->ctrl->setParameterByClass("ilnewstimelinegui", "cmd", "show");
-
-                    if ($type === "crs") {
-                        $link = $this->ctrl->getLinkTargetByClass(["ilrepositorygui", "ilobjcoursegui", "ilnewstimelinegui"]);
-                        $this->ctrl->redirectToURL(ilUtil::_getHttpPath() . "/" . htmlspecialchars_decode($link));
-                    } elseif ($type === "grp") {
-                        $link = $this->ctrl->getLinkTargetByClass(["ilrepositorygui", "ilobjgroupgui", "ilnewstimelinegui"]);
-                        $this->ctrl->redirectToURL(ilUtil::_getHttpPath() . "/" . htmlspecialchars_decode($link));
-                    }
-                    break;
-            }
+                if ($type === "crs") {
+                    $link = $this->ctrl->getLinkTargetByClass(["ilrepositorygui", "ilobjcoursegui", "ilnewstimelinegui"]);
+                    $this->ctrl->redirectToURL(ilUtil::_getHttpPath() . "/" . htmlspecialchars_decode($link));
+                } elseif ($type === "grp") {
+                    $link = $this->ctrl->getLinkTargetByClass(["ilrepositorygui", "ilobjgroupgui", "ilnewstimelinegui"]);
+                    $this->ctrl->redirectToURL(ilUtil::_getHttpPath() . "/" . htmlspecialchars_decode($link));
+                }
+                break;
         }
     }
 }

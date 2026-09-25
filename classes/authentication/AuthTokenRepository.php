@@ -25,6 +25,13 @@ final class AuthTokenRepository
     private const TABLE = 'ui_uihk_peg_token';
     private const TTL_SECONDS = 60;
 
+    /** The token existed, matched the user, and had not expired. */
+    public const STATUS_CONSUMED = 'consumed';
+    /** The token never existed, was already used, or belonged to another user -- these are indistinguishable by design (the row is looked up by token+user together). */
+    public const STATUS_UNKNOWN = 'unknown';
+    /** The token existed and matched the user, but its 60s TTL had passed. */
+    public const STATUS_EXPIRED = 'expired';
+
     /**
      * @var ilDBInterface
      */
@@ -63,9 +70,9 @@ final class AuthTokenRepository
      *
      * @param int    $userId
      * @param string $token
-     * @return bool true if the token existed, matched the user and had not expired
+     * @return string one of the STATUS_* constants
      */
-    public function consume(int $userId, string $token): bool
+    public function consume(int $userId, string $token): string
     {
         $set = $this->db->queryF(
             'SELECT expires FROM ' . self::TABLE . ' WHERE token = %s AND user_id = %s',
@@ -81,10 +88,10 @@ final class AuthTokenRepository
         );
 
         if ($row === null) {
-            return false;
+            return self::STATUS_UNKNOWN;
         }
 
-        return strtotime($row['expires']) > time();
+        return strtotime($row['expires']) > time() ? self::STATUS_CONSUMED : self::STATUS_EXPIRED;
     }
 
     private function purgeExpired(): void
